@@ -50,11 +50,39 @@ function getRequestedPage(path: string) {
     return "à ton compte";
   }
 
-  if (path === "/publier" || path.startsWith("/publier/")) {
+  if (
+    path === "/publier" ||
+    path.startsWith("/publier/")
+  ) {
     return "à la publication";
   }
 
   return "à cette page";
+}
+
+function LockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-7 w-7"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect
+        x="5"
+        y="10"
+        width="14"
+        height="10"
+        rx="2"
+      />
+
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
 }
 
 export default function ConnexionPage() {
@@ -190,10 +218,53 @@ export default function ConnexionPage() {
         />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-68px)] max-w-[1250px] items-center px-4 py-8 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-[1250px] px-4 py-6 sm:px-6 lg:px-8">
+        {/* =====================================================
+            MESSAGE D'ACCÈS — TOUJOURS EN HAUT
+        ===================================================== */}
+
+        {cameFromProtectedPage && (
+          <section className="relative mb-6 overflow-hidden rounded-[28px] border border-[#a9c9ff]/30 bg-gradient-to-r from-[#233246] to-[#30475d] p-5 shadow-[0_12px_35px_rgba(0,0,0,0.14)] sm:p-6">
+            <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-[#a9c9ff]/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-[#a9c9ff]">
+                <LockIcon />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
+                  Accès réservé
+                </div>
+
+                <h1 className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">
+                  Tu dois être connecté pour continuer
+                </h1>
+
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Tu viens d&apos;essayer d&apos;ouvrir{" "}
+                  <strong className="font-black text-white">
+                    {requestedPage}
+                  </strong>
+                  . Connecte-toi ou crée ton compte pour accéder
+                  au contenu.
+                </p>
+
+                <div className="mt-4 inline-flex rounded-full border border-white/10 bg-black/[0.12] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  Après connexion → retour automatique
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* =====================================================
+            CONTENU
+        ===================================================== */}
+
         <div className="grid w-full gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           {/* ==================================================
-              LEFT
+              INTRO
           ================================================== */}
 
           <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.15)] sm:p-10">
@@ -206,17 +277,18 @@ export default function ConnexionPage() {
                   Part-66 training
                 </div>
 
-                <h1 className="mt-5 text-5xl font-black leading-[0.88] tracking-[-0.06em] text-white sm:text-6xl">
+                <h2 className="mt-5 text-5xl font-black leading-[0.88] tracking-[-0.06em] text-white sm:text-6xl">
                   B1.1
                   <br />
                   <span className="text-slate-300">
                     STUDENT
                   </span>
-                </h1>
+                </h2>
 
                 <p className="mt-6 max-w-md text-sm leading-7 text-slate-300">
                   Connecte-toi à ton espace étudiant pour
-                  accéder à tous les contenus de la plateforme.
+                  accéder aux cours, aux QCM, aux fiches et à
+                  toute ta progression.
                 </p>
               </div>
 
@@ -235,7 +307,7 @@ export default function ConnexionPage() {
 
                   <svg
                     viewBox="0 0 320 320"
-                    className="relative z-10 h-36 w-36 text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.18)]"
+                    className="relative z-10 h-36 w-36 text-white"
                     fill="currentColor"
                     aria-hidden="true"
                   >
@@ -268,71 +340,10 @@ export default function ConnexionPage() {
           </section>
 
           {/* ==================================================
-              RIGHT
+              FORMULAIRE
           ================================================== */}
 
           <section className="rounded-[38px] border border-white/10 bg-[#202d3d] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.12)] sm:p-9">
-
-            {/* =================================================
-                GROS MESSAGE D'ACCÈS
-            ================================================= */}
-
-            {cameFromProtectedPage && (
-              <div className="mb-8 rounded-[28px] border border-[#a9c9ff]/25 bg-[#a9c9ff]/[0.08] p-5 sm:p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-[#a9c9ff]">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-7 w-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      aria-hidden="true"
-                    >
-                      <rect
-                        x="5"
-                        y="10"
-                        width="14"
-                        height="10"
-                        rx="2"
-                      />
-                      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                    </svg>
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                      Accès réservé
-                    </div>
-
-                    <h2 className="mt-2 text-xl font-black leading-6 text-white sm:text-2xl">
-                      Tu dois être connecté
-                    </h2>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
-                      Pour accéder {requestedPage}, tu dois
-                      d&apos;abord te connecter à ton compte étudiant.
-                    </p>
-
-                    <div className="mt-4 rounded-2xl border border-white/[0.07] bg-black/[0.12] px-4 py-3">
-                      <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-600">
-                        Destination demandée
-                      </div>
-
-                      <div className="mt-1 text-sm font-black text-white">
-                        {requestedPage.charAt(0).toUpperCase() +
-                          requestedPage.slice(1)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* =================================================
-                TITRE
-            ================================================= */}
-
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
                 Student access
@@ -480,19 +491,6 @@ export default function ConnexionPage() {
                     : "Créer mon compte →"}
               </button>
             </form>
-
-            {/* =================================================
-                RAPPEL
-            ================================================= */}
-
-            {cameFromProtectedPage && (
-              <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-center">
-                <p className="text-xs leading-5 text-slate-500">
-                  Après connexion, tu seras automatiquement
-                  redirigé vers la page que tu voulais ouvrir.
-                </p>
-              </div>
-            )}
 
             <div className="mt-7 border-t border-white/[0.07] pt-6 text-center">
               <Link
