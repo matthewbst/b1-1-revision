@@ -14,6 +14,8 @@ const ADMIN_ID =
 const ONLINE_WINDOW_MS =
   5 * 60 * 1000;
 
+const DAYS_TO_ANALYZE = 14;
+
 type Module = {
   id: number;
   name: string;
@@ -90,7 +92,21 @@ function formatDate(value: string) {
   );
 }
 
-function formatDateTime(value: string) {
+function formatShortDate(
+  value: string,
+) {
+  return new Date(value).toLocaleDateString(
+    "fr-FR",
+    {
+      day: "2-digit",
+      month: "2-digit",
+    },
+  );
+}
+
+function formatDateTime(
+  value: string,
+) {
   return new Date(value).toLocaleString(
     "fr-FR",
     {
@@ -137,6 +153,281 @@ function initials(
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function dayKey(date: Date) {
+  const year = date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getLastDays(count: number) {
+  const result: Date[] = [];
+
+  const today = new Date();
+
+  today.setHours(
+    0,
+    0,
+    0,
+    0,
+  );
+
+  for (
+    let index = count - 1;
+    index >= 0;
+    index--
+  ) {
+    const date = new Date(today);
+
+    date.setDate(
+      today.getDate() - index,
+    );
+
+    result.push(date);
+  }
+
+  return result;
+}
+
+function scoreBucket(
+  percentage: number,
+) {
+  if (percentage < 60) {
+    return "Moins de 60 %";
+  }
+
+  if (percentage < 80) {
+    return "60–79 %";
+  }
+
+  if (percentage < 90) {
+    return "80–89 %";
+  }
+
+  return "90 % et +";
+}
+
+/* ============================================================
+   MINI GRAPHIQUE EN LIGNE
+============================================================ */
+
+function LineChart({
+  data,
+  label,
+  suffix = "",
+}: {
+  data: {
+    label: string;
+    value: number;
+  }[];
+  label: string;
+  suffix?: string;
+}) {
+  const width = 720;
+  const height = 220;
+  const paddingX = 24;
+  const paddingY = 28;
+
+  const maxValue =
+    Math.max(
+      1,
+      ...data.map(
+        (item) => item.value,
+      ),
+    );
+
+  const points = data.map(
+    (item, index) => {
+      const x =
+        paddingX +
+        (index /
+          Math.max(
+            1,
+            data.length - 1,
+          )) *
+          (width -
+            paddingX * 2);
+
+      const y =
+        height -
+        paddingY -
+        (item.value /
+          maxValue) *
+          (height -
+            paddingY * 2);
+
+      return {
+        ...item,
+        x,
+        y,
+      };
+    },
+  );
+
+  const linePoints = points
+    .map(
+      (point) =>
+        `${point.x},${point.y}`,
+    )
+    .join(" ");
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+          {label}
+        </div>
+
+        <div className="text-[9px] font-bold text-slate-600">
+          max {maxValue}
+          {suffix}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#182332] p-3">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-[220px] w-full"
+          preserveAspectRatio="none"
+          aria-label={label}
+        >
+          {[0.25, 0.5, 0.75].map(
+            (ratio) => {
+              const y =
+                height -
+                paddingY -
+                ratio *
+                  (height -
+                    paddingY * 2);
+
+              return (
+                <line
+                  key={ratio}
+                  x1={paddingX}
+                  x2={width - paddingX}
+                  y1={y}
+                  y2={y}
+                  stroke="rgba(255,255,255,0.07)"
+                  strokeWidth="1"
+                />
+              );
+            },
+          )}
+
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke="rgba(169,201,255,0.95)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {points.map(
+            (point) => (
+              <g
+                key={`${point.label}-${point.x}`}
+              >
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="4"
+                  fill="#182332"
+                  stroke="rgba(169,201,255,0.95)"
+                  strokeWidth="2"
+                />
+              </g>
+            ),
+          )}
+        </svg>
+
+        <div className="mt-2 grid grid-cols-7 gap-1 text-[8px] font-bold text-slate-600">
+          {data
+            .filter(
+              (_, index) =>
+                index === 0 ||
+                index ===
+                  data.length - 1 ||
+                index %
+                    2 ===
+                  0,
+            )
+            .map(
+              (item) => (
+                <span
+                  key={
+                    item.label
+                  }
+                  className="text-center"
+                >
+                  {item.label}
+                </span>
+              ),
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   BARRE HORIZONTALE
+============================================================ */
+
+function StatBar({
+  label,
+  value,
+  max,
+  suffix = "",
+}: {
+  label: string;
+  value: number;
+  max: number;
+  suffix?: string;
+}) {
+  const width =
+    max > 0
+      ? Math.max(
+          value > 0 ? 4 : 0,
+          Math.min(
+            100,
+            (value / max) * 100,
+          ),
+        )
+      : 0;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="truncate text-xs font-bold text-slate-300">
+          {label}
+        </span>
+
+        <span className="shrink-0 text-xs font-black text-[#a9c9ff]">
+          {value}
+          {suffix}
+        </span>
+      </div>
+
+      <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+        <div
+          className="h-full rounded-full bg-[#6ea8ff]"
+          style={{
+            width: `${width}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function AdminPage() {
@@ -205,7 +496,8 @@ export default function AdminPage() {
         )
         .order("created_at", {
           ascending: false,
-        }),
+        })
+        .limit(5000),
 
       supabase
         .from("user_presence")
@@ -234,16 +526,18 @@ export default function AdminPage() {
       profilesResult.data || [],
     );
 
-    const onlineIds = Array.from(
-      new Set(
-        (
-          presenceResult.data ||
-          []
-        ).map(
-          (item) => item.user_id,
+    const onlineIds =
+      Array.from(
+        new Set(
+          (
+            presenceResult.data ||
+            []
+          ).map(
+            (item) =>
+              item.user_id,
+          ),
         ),
-      ),
-    );
+      );
 
     setOnlineUserIds(
       onlineIds,
@@ -305,7 +599,7 @@ export default function AdminPage() {
           .order("created_at", {
             ascending: false,
           })
-          .limit(2000),
+          .limit(5000),
 
         supabase
           .from("course_files")
@@ -333,7 +627,7 @@ export default function AdminPage() {
           .order("created_at", {
             ascending: false,
           })
-          .limit(2000),
+          .limit(5000),
       ]);
 
       if (modulesResult.error) {
@@ -388,148 +682,21 @@ export default function AdminPage() {
     load();
     loadUsers();
 
-    const usersInterval =
-      setInterval(() => {
-        loadUsers();
-      }, 30_000);
+    const interval =
+      setInterval(
+        loadUsers,
+        30_000,
+      );
 
     return () => {
       mounted = false;
-      clearInterval(usersInterval);
+      clearInterval(interval);
     };
   }, []);
 
-  const approvedQuestions =
-    questions.filter(
-      (question) =>
-        question.status ===
-        "approved",
-    ).length;
-
-  const draftQuestions =
-    questions.filter(
-      (question) =>
-        question.status === "draft",
-    ).length;
-
-  const rejectedQuestions =
-    questions.filter(
-      (question) =>
-        question.status ===
-        "rejected",
-    ).length;
-
-  const average = useMemo(() => {
-    if (attempts.length === 0) {
-      return 0;
-    }
-
-    return Math.round(
-      attempts.reduce(
-        (sum, attempt) =>
-          sum + attempt.percentage,
-        0,
-      ) / attempts.length,
-    );
-  }, [attempts]);
-
-  const bestScore = useMemo(() => {
-    if (attempts.length === 0) {
-      return 0;
-    }
-
-    return Math.max(
-      ...attempts.map(
-        (attempt) =>
-          attempt.percentage,
-      ),
-    );
-  }, [attempts]);
-
-  const moduleStats = useMemo(() => {
-    return modules.map((module) => {
-      const moduleQuestions =
-        questions.filter(
-          (question) =>
-            question.module_id ===
-            module.id,
-        );
-
-      const moduleCourses =
-        courses.filter(
-          (course) =>
-            course.module_id ===
-            module.id,
-        );
-
-      const moduleSheets =
-        sheets.filter(
-          (sheet) =>
-            sheet.module_id ===
-            module.id,
-        );
-
-      const moduleAttempts =
-        attempts.filter(
-          (attempt) =>
-            attempt.module_id ===
-            module.id,
-        );
-
-      const moduleAverage =
-        moduleAttempts.length > 0
-          ? Math.round(
-              moduleAttempts.reduce(
-                (sum, attempt) =>
-                  sum +
-                  attempt.percentage,
-                0,
-              ) /
-                moduleAttempts.length,
-            )
-          : 0;
-
-      const moduleDrafts =
-        moduleQuestions.filter(
-          (question) =>
-            question.status ===
-            "draft",
-        ).length;
-
-      return {
-        module,
-        questions:
-          moduleQuestions.length,
-        drafts:
-          moduleDrafts,
-        courses:
-          moduleCourses.length,
-        sheets:
-          moduleSheets.length,
-        attempts:
-          moduleAttempts.length,
-        average:
-          moduleAverage,
-      };
-    });
-  }, [
-    modules,
-    questions,
-    courses,
-    sheets,
-    attempts,
-  ]);
-
-  const recentQuestions =
-    questions.slice(0, 7);
-
-  const recentCourses =
-    courses.slice(0, 6);
-
-  const modulesWithDrafts =
-    moduleStats.filter(
-      (item) => item.drafts > 0,
-    ).length;
+  /* ============================================================
+     MAPS
+  ============================================================ */
 
   const moduleMap = useMemo(
     () =>
@@ -553,85 +720,383 @@ export default function AdminPage() {
     [profiles],
   );
 
-  const isOnline = (
-    userId: string,
-  ) =>
-    onlineUserIds.includes(
-      userId,
-    );
+  /* ============================================================
+     KPI GENERALES
+  ============================================================ */
+
+  const approvedQuestions =
+    questions.filter(
+      (question) =>
+        question.status ===
+        "approved",
+    ).length;
+
+  const draftQuestions =
+    questions.filter(
+      (question) =>
+        question.status === "draft",
+    ).length;
+
+  const rejectedQuestions =
+    questions.filter(
+      (question) =>
+        question.status ===
+        "rejected",
+    ).length;
+
+  const average =
+    attempts.length > 0
+      ? Math.round(
+          attempts.reduce(
+            (sum, attempt) =>
+              sum +
+              attempt.percentage,
+            0,
+          ) /
+            attempts.length,
+        )
+      : 0;
+
+  const bestScore =
+    attempts.length > 0
+      ? Math.max(
+          ...attempts.map(
+            (attempt) =>
+              attempt.percentage,
+          ),
+        )
+      : 0;
+
+  /* ============================================================
+     DATES
+  ============================================================ */
+
+  const chartDays = useMemo(
+    () =>
+      getLastDays(
+        DAYS_TO_ANALYZE,
+      ),
+    [],
+  );
+
+  const recentSince =
+    Date.now() -
+    7 *
+      24 *
+      60 *
+      60 *
+      1000;
 
   const newUsersLast7Days =
-    useMemo(() => {
-      const since =
-        Date.now() -
-        7 *
-          24 *
-          60 *
-          60 *
-          1000;
+    profiles.filter(
+      (profile) =>
+        new Date(
+          profile.created_at,
+        ).getTime() >=
+        recentSince,
+    ).length;
 
-      return profiles.filter(
-        (profile) =>
-          new Date(
-            profile.created_at,
-          ).getTime() >= since,
-      ).length;
-    }, [profiles]);
+  const attemptsLast7Days =
+    attempts.filter(
+      (attempt) =>
+        new Date(
+          attempt.created_at,
+        ).getTime() >=
+        recentSince,
+    );
 
-  const qcmLast7Days =
-    useMemo(() => {
-      const since =
-        Date.now() -
-        7 *
-          24 *
-          60 *
-          60 *
-          1000;
-
-      return attempts.filter(
+  const activeStudentsLast7Days =
+    new Set(
+      attemptsLast7Days.map(
         (attempt) =>
-          new Date(
-            attempt.created_at,
-          ).getTime() >= since,
-      ).length;
+          attempt.user_id,
+      ),
+    ).size;
+
+  /* ============================================================
+     GRAPHIQUE INSCRIPTIONS
+  ============================================================ */
+
+  const registrationChart =
+    useMemo(() => {
+      return chartDays.map(
+        (date) => {
+          const key =
+            dayKey(date);
+
+          const count =
+            profiles.filter(
+              (profile) =>
+                dayKey(
+                  new Date(
+                    profile.created_at,
+                  ),
+                ) === key,
+            ).length;
+
+          return {
+            label:
+              formatShortDate(
+                date.toISOString(),
+              ),
+            value: count,
+          };
+        },
+      );
+    }, [
+      chartDays,
+      profiles,
+    ]);
+
+  /* ============================================================
+     GRAPHIQUE QCM
+  ============================================================ */
+
+  const qcmChart = useMemo(
+    () => {
+      return chartDays.map(
+        (date) => {
+          const key =
+            dayKey(date);
+
+          const count =
+            attempts.filter(
+              (attempt) =>
+                dayKey(
+                  new Date(
+                    attempt.created_at,
+                  ),
+                ) === key,
+            ).length;
+
+          return {
+            label:
+              formatShortDate(
+                date.toISOString(),
+              ),
+            value: count,
+          };
+        },
+      );
+    },
+    [
+      chartDays,
+      attempts,
+    ],
+  );
+
+  /* ============================================================
+     GRAPHIQUE SCORE MOYEN
+  ============================================================ */
+
+  const scoreChart = useMemo(
+    () => {
+      return chartDays.map(
+        (date) => {
+          const key =
+            dayKey(date);
+
+          const dayAttempts =
+            attempts.filter(
+              (attempt) =>
+                dayKey(
+                  new Date(
+                    attempt.created_at,
+                  ),
+                ) === key,
+            );
+
+          const value =
+            dayAttempts.length >
+            0
+              ? Math.round(
+                  dayAttempts.reduce(
+                    (
+                      sum,
+                      attempt,
+                    ) =>
+                      sum +
+                      attempt.percentage,
+                    0,
+                  ) /
+                    dayAttempts.length,
+                )
+              : 0;
+
+          return {
+            label:
+              formatShortDate(
+                date.toISOString(),
+              ),
+            value,
+          };
+        },
+      );
+    },
+    [
+      chartDays,
+      attempts,
+    ],
+  );
+
+  /* ============================================================
+     STATS MODULES
+  ============================================================ */
+
+  const moduleStats = useMemo(() => {
+    return modules
+      .map((module) => {
+        const moduleQuestions =
+          questions.filter(
+            (question) =>
+              question.module_id ===
+              module.id,
+          );
+
+        const moduleCourses =
+          courses.filter(
+            (course) =>
+              course.module_id ===
+              module.id,
+          );
+
+        const moduleSheets =
+          sheets.filter(
+            (sheet) =>
+              sheet.module_id ===
+              module.id,
+          );
+
+        const moduleAttempts =
+          attempts.filter(
+            (attempt) =>
+              attempt.module_id ===
+              module.id,
+          );
+
+        const moduleAverage =
+          moduleAttempts.length
+            ? Math.round(
+                moduleAttempts.reduce(
+                  (
+                    sum,
+                    attempt,
+                  ) =>
+                    sum +
+                    attempt.percentage,
+                  0,
+                ) /
+                  moduleAttempts.length,
+              )
+            : 0;
+
+        const moduleBest =
+          moduleAttempts.length
+            ? Math.max(
+                ...moduleAttempts.map(
+                  (attempt) =>
+                    attempt.percentage,
+                ),
+              )
+            : 0;
+
+        const drafts =
+          moduleQuestions.filter(
+            (question) =>
+              question.status ===
+              "draft",
+          ).length;
+
+        return {
+          module,
+          questions:
+            moduleQuestions.length,
+          courses:
+            moduleCourses.length,
+          sheets:
+            moduleSheets.length,
+          attempts:
+            moduleAttempts.length,
+          average:
+            moduleAverage,
+          best: moduleBest,
+          drafts,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.attempts -
+          a.attempts,
+      );
+  }, [
+    modules,
+    questions,
+    courses,
+    sheets,
+    attempts,
+  ]);
+
+  const mostWorkedModules =
+    moduleStats.slice(0, 7);
+
+  /* ============================================================
+     REPARTITION DES SCORES
+  ============================================================ */
+
+  const scoreDistribution =
+    useMemo(() => {
+      const buckets = [
+        {
+          label: "Moins de 60 %",
+          value: 0,
+        },
+        {
+          label: "60–79 %",
+          value: 0,
+        },
+        {
+          label: "80–89 %",
+          value: 0,
+        },
+        {
+          label: "90 % et +",
+          value: 0,
+        },
+      ];
+
+      for (const attempt of attempts) {
+        const bucket =
+          scoreBucket(
+            attempt.percentage,
+          );
+
+        const item =
+          buckets.find(
+            (entry) =>
+              entry.label ===
+              bucket,
+          );
+
+        if (item) {
+          item.value += 1;
+        }
+      }
+
+      return buckets;
     }, [attempts]);
 
-  const searchedProfiles =
-    useMemo(() => {
-      const search =
-        userSearch
-          .trim()
-          .toLowerCase();
+  const scoreDistributionMax =
+    Math.max(
+      1,
+      ...scoreDistribution.map(
+        (item) =>
+          item.value,
+      ),
+    );
 
-      return profiles
-        .filter((profile) => {
-          if (
-            showOnlyOnline &&
-            !isOnline(profile.id)
-          ) {
-            return false;
-          }
-
-          if (!search) {
-            return true;
-          }
-
-          const haystack =
-            `${profileName(profile)} ${
-              profile.email || ""
-            }`.toLowerCase();
-
-          return haystack.includes(
-            search,
-          );
-        })
-        .slice(0, 30);
-    }, [
-      profiles,
-      userSearch,
-      showOnlyOnline,
-      onlineUserIds,
-    ]);
+  /* ============================================================
+     STATS ETUDIANTS
+  ============================================================ */
 
   const studentStats =
     useMemo(() => {
@@ -645,10 +1110,13 @@ export default function AdminPage() {
             );
 
           const userAverage =
-            userAttempts.length > 0
+            userAttempts.length
               ? Math.round(
                   userAttempts.reduce(
-                    (sum, attempt) =>
+                    (
+                      sum,
+                      attempt,
+                    ) =>
                       sum +
                       attempt.percentage,
                     0,
@@ -657,12 +1125,8 @@ export default function AdminPage() {
                 )
               : 0;
 
-          const lastAttempt =
-            userAttempts[0] ||
-            null;
-
-          const best =
-            userAttempts.length > 0
+          const userBest =
+            userAttempts.length
               ? Math.max(
                   ...userAttempts.map(
                     (attempt) =>
@@ -677,11 +1141,15 @@ export default function AdminPage() {
               userAttempts.length,
             average:
               userAverage,
-            best,
-            lastAttempt,
-            online: isOnline(
-              profile.id,
-            ),
+            best:
+              userBest,
+            lastAttempt:
+              userAttempts[0] ||
+              null,
+            online:
+              onlineUserIds.includes(
+                profile.id,
+              ),
           };
         },
       );
@@ -691,12 +1159,6 @@ export default function AdminPage() {
       onlineUserIds,
     ]);
 
-  const recentStudents =
-    studentStats.slice(
-      0,
-      6,
-    );
-
   const topActiveStudents =
     [...studentStats]
       .sort(
@@ -704,26 +1166,104 @@ export default function AdminPage() {
           b.attempts -
           a.attempts,
       )
-      .slice(0, 5);
+      .slice(0, 6);
 
-  const onlineStudentsCount =
+  const searchedProfiles =
+    useMemo(() => {
+      const search =
+        userSearch
+          .trim()
+          .toLowerCase();
+
+      return studentStats
+        .filter((student) => {
+          if (
+            showOnlyOnline &&
+            !student.online
+          ) {
+            return false;
+          }
+
+          if (!search) {
+            return true;
+          }
+
+          const text =
+            `${profileName(
+              student.profile,
+            )} ${
+              student.profile
+                .email || ""
+            }`.toLowerCase();
+
+          return text.includes(
+            search,
+          );
+        })
+        .slice(0, 30);
+    }, [
+      studentStats,
+      userSearch,
+      showOnlyOnline,
+    ]);
+
+  /* ============================================================
+     MODULE LE PLUS TRAVAILLE
+  ============================================================ */
+
+  const hardestModule =
+    [...moduleStats]
+      .filter(
+        (item) =>
+          item.attempts > 0,
+      )
+      .sort(
+        (a, b) =>
+          a.average -
+          b.average,
+      )[0] || null;
+
+  const bestModule =
+    [...moduleStats]
+      .filter(
+        (item) =>
+          item.attempts > 0,
+      )
+      .sort(
+        (a, b) =>
+          b.average -
+          a.average,
+      )[0] || null;
+
+  const maxModuleAttempts =
+    Math.max(
+      1,
+      ...moduleStats.map(
+        (item) =>
+          item.attempts,
+      ),
+    );
+
+  const recentQuestions =
+    questions.slice(0, 7);
+
+  const recentCourses =
+    courses.slice(0, 6);
+
+  const modulesWithDrafts =
+    moduleStats.filter(
+      (item) =>
+        item.drafts > 0,
+    ).length;
+
+  const onlineUsers =
     onlineUserIds.length;
 
-  const inactiveStudentsCount =
+  const inactiveUsers =
     Math.max(
       0,
       profiles.length -
-        onlineStudentsCount,
-    );
-
-  const activityByStudent =
-    new Map(
-      studentStats.map(
-        (item) => [
-          item.profile.id,
-          item,
-        ],
-      ),
+        onlineUsers,
     );
 
   if (
@@ -748,14 +1288,14 @@ export default function AdminPage() {
       ===================================================== */}
 
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-1/2 top-[-120px] h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
+        <div className="absolute left-1/2 top-[-120px] h-[700px] w-[700px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[140px]" />
 
-        <div className="absolute left-[-140px] top-[45%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
+        <div className="absolute left-[-150px] top-[40%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
-        <div className="absolute right-[-140px] top-[20%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
+        <div className="absolute right-[-150px] top-[20%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
         <div
-          className="absolute inset-0 opacity-[0.025]"
+          className="absolute inset-0 opacity-[0.022]"
           style={{
             backgroundImage:
               "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
@@ -765,7 +1305,7 @@ export default function AdminPage() {
         />
       </div>
 
-      <div className="relative mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-[1550px] px-4 py-7 sm:px-6 lg:px-8">
         {/* =====================================================
             HEADER
         ===================================================== */}
@@ -776,18 +1316,17 @@ export default function AdminPage() {
           <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
                 Administration center
               </div>
 
-              <h1 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] text-white sm:text-5xl">
+              <h1 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] sm:text-5xl">
                 Centre de contrôle
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Gère les contenus, surveille les étudiants et visualise
-                l&apos;activité de la plateforme Part-66 B1.1.
+                Analyse l&apos;activité de la plateforme, suis les étudiants
+                et surveille l&apos;ensemble des contenus Part-66 B1.1.
               </p>
             </div>
 
@@ -811,130 +1350,395 @@ export default function AdminPage() {
         )}
 
         {/* =====================================================
-            UTILISATEURS
+            KPI PRINCIPAUX
         ===================================================== */}
 
-        <section className="mt-5">
+        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              Étudiants
+            </div>
+
+            <div className="mt-3 text-3xl font-black">
+              {profiles.length}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              inscrits
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
+            <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Actifs
+            </div>
+
+            <div className="mt-3 text-3xl font-black text-emerald-300">
+              {onlineUsers}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              sur les 5 dernières min
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              Nouveaux
+            </div>
+
+            <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
+              {newUsersLast7Days}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              cette semaine
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              QCM
+            </div>
+
+            <div className="mt-3 text-3xl font-black">
+              {attempts.length}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              {attemptsLast7Days.length} cette semaine
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              Moyenne
+            </div>
+
+            <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
+              {attempts.length
+                ? `${average}%`
+                : "—"}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              tous les QCM
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              Actifs 7 jours
+            </div>
+
+            <div className="mt-3 text-3xl font-black">
+              {activeStudentsLast7Days}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              étudiants différents
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================
+            ANALYTICS
+        ===================================================== */}
+
+        <section className="mt-10">
           <div className="mb-5">
             <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Student monitoring
+              Analytics
             </div>
 
             <h2 className="mt-2 text-2xl font-black">
-              Gestion des étudiants
+              Statistiques de la plateforme
             </h2>
 
-            <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Suis les inscriptions et l&apos;activité récente des étudiants.
+            <p className="mt-2 text-sm text-slate-500">
+              Evolution sur les {DAYS_TO_ANALYZE} derniers jours.
             </p>
           </div>
 
-          {/* KPI ETUDIANTS */}
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Total inscrits
-              </div>
-
-              <div className="mt-3 text-3xl font-black">
-                {usersLoading
-                  ? "—"
-                  : profiles.length}
-              </div>
-
-              <div className="mt-1 text-[10px] text-slate-500">
-                comptes étudiants
-              </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <LineChart
+                data={registrationChart}
+                label="Nouvelles inscriptions par jour"
+              />
             </div>
 
-            <div className="rounded-[28px] border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
-              <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
-                En ligne
-              </div>
-
-              <div className="mt-3 text-3xl font-black text-emerald-300">
-                {usersLoading
-                  ? "—"
-                  : onlineStudentsCount}
-              </div>
-
-              <div className="mt-1 text-[10px] text-slate-500">
-                actifs sur 5 min
-              </div>
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <LineChart
+                data={qcmChart}
+                label="QCM réalisés par jour"
+              />
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Nouveaux
-              </div>
-
-              <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
-                {usersLoading
-                  ? "—"
-                  : newUsersLast7Days}
-              </div>
-
-              <div className="mt-1 text-[10px] text-slate-500">
-                ces 7 derniers jours
-              </div>
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <LineChart
+                data={scoreChart}
+                label="Score moyen par jour"
+                suffix="%"
+              />
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                QCM cette semaine
+            {/* REPARTITION SCORES */}
+
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                Performance
               </div>
 
-              <div className="mt-3 text-3xl font-black text-white">
-                {qcmLast7Days}
+              <h3 className="mt-2 text-2xl font-black">
+                Répartition des scores
+              </h3>
+
+              <div className="mt-7 space-y-5">
+                {scoreDistribution.map(
+                  (item) => (
+                    <StatBar
+                      key={item.label}
+                      label={item.label}
+                      value={item.value}
+                      max={
+                        scoreDistributionMax
+                      }
+                      suffix=" QCM"
+                    />
+                  ),
+                )}
               </div>
 
-              <div className="mt-1 text-[10px] text-slate-500">
-                entraînements
-              </div>
-            </div>
+              <div className="mt-7 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-white/[0.025] p-4">
+                  <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
+                    Meilleur score
+                  </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Inactifs
-              </div>
+                  <div className="mt-2 text-2xl font-black text-emerald-300">
+                    {attempts.length
+                      ? `${bestScore}%`
+                      : "—"}
+                  </div>
+                </div>
 
-              <div className="mt-3 text-3xl font-black text-slate-300">
-                {usersLoading
-                  ? "—"
-                  : inactiveStudentsCount}
-              </div>
+                <div className="rounded-2xl bg-white/[0.025] p-4">
+                  <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
+                    Moyenne
+                  </div>
 
-              <div className="mt-1 text-[10px] text-slate-500">
-                pas actifs depuis 5 min
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Moyenne globale
-              </div>
-
-              <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
-                {attempts.length
-                  ? `${average}%`
-                  : "—"}
-              </div>
-
-              <div className="mt-1 text-[10px] text-slate-500">
-                tous les QCM
+                  <div className="mt-2 text-2xl font-black text-[#a9c9ff]">
+                    {attempts.length
+                      ? `${average}%`
+                      : "—"}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          {/* RECHERCHE + LISTE */}
+        {/* =====================================================
+            MODULES LES PLUS TRAVAILLES
+        ===================================================== */}
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <section className="mt-10 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                Modules
+              </div>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Modules les plus travaillés
+              </h2>
+
+              <p className="mt-2 text-xs text-slate-500">
+                Basé sur le nombre de QCM réalisés.
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {mostWorkedModules.map(
+                (item) => (
+                  <div
+                    key={
+                      item.module.id
+                    }
+                  >
+                    <div className="mb-2 flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-[10px] font-black text-[#a9c9ff]">
+                        {moduleNumber(
+                          item.module.name,
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black">
+                          {moduleTitle(
+                            item.module.name,
+                          )}
+                        </div>
+
+                        <div className="mt-0.5 text-[9px] text-slate-600">
+                          {
+                            item.attempts
+                          }{" "}
+                          QCM ·{" "}
+                          {
+                            item.average
+                          }
+                          % de moyenne
+                        </div>
+                      </div>
+
+                      <div className="text-sm font-black text-[#a9c9ff]">
+                        {
+                          item.attempts
+                        }
+                      </div>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className="h-full rounded-full bg-[#6ea8ff]"
+                        style={{
+                          width: `${
+                            Math.max(
+                              item.attempts >
+                                0
+                                ? 4
+                                : 0,
+                              (item.attempts /
+                                maxModuleAttempts) *
+                                100,
+                            )
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ),
+              )}
+
+              {mostWorkedModules.length ===
+                0 && (
+                <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center text-sm text-slate-500">
+                  Aucun QCM réalisé pour le moment.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* MODULES A SURVEILLER */}
+
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                Analyse pédagogique
+              </div>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Modules à surveiller
+              </h2>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <div className="rounded-2xl border border-orange-300/10 bg-orange-300/[0.035] p-5">
+                <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-600">
+                  Moyenne la plus basse
+                </div>
+
+                <div className="mt-2 text-lg font-black text-white">
+                  {hardestModule
+                    ? moduleTitle(
+                        hardestModule
+                          .module.name,
+                      )
+                    : "Pas encore disponible"}
+                </div>
+
+                {hardestModule && (
+                  <div className="mt-1 text-xs font-black text-orange-300">
+                    {
+                      hardestModule.average
+                    }{" "}
+                    % ·{" "}
+                    {
+                      hardestModule.attempts
+                    }{" "}
+                    QCM
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
+                <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-600">
+                  Meilleure moyenne
+                </div>
+
+                <div className="mt-2 text-lg font-black text-white">
+                  {bestModule
+                    ? moduleTitle(
+                        bestModule
+                          .module.name,
+                      )
+                    : "Pas encore disponible"}
+                </div>
+
+                {bestModule && (
+                  <div className="mt-1 text-xs font-black text-emerald-300">
+                    {bestModule.average}{" "}
+                    % ·{" "}
+                    {
+                      bestModule.attempts
+                    }{" "}
+                    QCM
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400">
+                    Modules avec brouillons
+                  </span>
+
+                  <span className="text-lg font-black text-amber-300">
+                    {
+                      modulesWithDrafts
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================
+            ACTIVITE ETUDIANTS
+        ===================================================== */}
+
+        <section className="mt-10">
+          <div className="mb-5">
+            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+              Student analytics
+            </div>
+
+            <h2 className="mt-2 text-2xl font-black">
+              Activité des étudiants
+            </h2>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            {/* RECHERCHE */}
+
             <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                  <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
                     Utilisateurs
                   </div>
 
@@ -944,10 +1748,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="text-xs font-bold text-slate-600">
-                  {searchedProfiles.length} affiché
-                  {searchedProfiles.length > 1
-                    ? "s"
-                    : ""}
+                  {profiles.length} inscrits
                 </div>
               </div>
 
@@ -972,12 +1773,15 @@ export default function AdminPage() {
 
                   <input
                     value={userSearch}
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       setUserSearch(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
-                    placeholder="Rechercher un étudiant ou un email..."
+                    placeholder="Rechercher un étudiant..."
                     className="w-full rounded-2xl border border-white/10 bg-[#182332] py-4 pl-12 pr-4 text-sm font-medium text-white outline-none placeholder:text-slate-600 focus:border-[#a9c9ff]/20"
                   />
                 </div>
@@ -996,242 +1800,160 @@ export default function AdminPage() {
                       : "border-white/10 bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-white"
                   }`}
                 >
-                  ● En ligne uniquement
+                  ● En ligne
                 </button>
               </div>
 
               {usersError && (
                 <div className="mt-4 rounded-2xl border border-red-300/20 bg-red-300/10 p-4 text-xs leading-6 text-red-200">
-                  Impossible de charger les utilisateurs :{" "}
                   {usersError}
                 </div>
               )}
 
               <div className="mt-5 space-y-2">
                 {usersLoading ? (
-                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-slate-500">
-                    Chargement des étudiants...
+                  <div className="rounded-2xl border border-white/[0.06] p-6 text-sm text-slate-500">
+                    Chargement...
                   </div>
-                ) : searchedProfiles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center">
-                    <div className="text-2xl">
-                      👤
-                    </div>
-
-                    <div className="mt-3 text-sm font-black">
-                      Aucun étudiant trouvé
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-600">
-                      Modifie ta recherche.
-                    </div>
+                ) : searchedProfiles.length ===
+                  0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center text-sm text-slate-500">
+                    Aucun étudiant trouvé.
                   </div>
                 ) : (
                   searchedProfiles.map(
-                    (profile) => {
-                      const stats =
-                        activityByStudent.get(
-                          profile.id,
-                        );
+                    (student) => (
+                      <div
+                        key={
+                          student.profile
+                            .id
+                        }
+                        className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 sm:flex-row sm:items-center"
+                      >
+                        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-xs font-black text-[#c5dcff]">
+                          {initials(
+                            student.profile,
+                          )}
 
-                      const online =
-                        isOnline(
-                          profile.id,
-                        );
+                          {student.online && (
+                            <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
+                          )}
+                        </div>
 
-                      return (
-                        <div
-                          key={
-                            profile.id
-                          }
-                          className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 sm:flex-row sm:items-center"
-                        >
-                          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-xs font-black text-[#c5dcff]">
-                            {initials(
-                              profile,
-                            )}
-
-                            {online && (
-                              <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-black text-white">
+                            {profileName(
+                              student.profile,
                             )}
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-black text-white">
-                              {profileName(
-                                profile,
-                              )}
+                          <div className="mt-1 truncate text-[10px] text-slate-500">
+                            {student.profile
+                              .email ||
+                              "Email non disponible"}
+                          </div>
+
+                          <div className="mt-1 text-[9px] text-slate-600">
+                            Inscrit le{" "}
+                            {formatDate(
+                              student.profile
+                                .created_at,
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 sm:w-[340px]">
+                          <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                            <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                              QCM
                             </div>
 
-                            <div className="mt-1 truncate text-[10px] text-slate-500">
-                              {profile.email ||
-                                "Email non disponible"}
-                            </div>
-
-                            <div className="mt-1 text-[9px] text-slate-600">
-                              Inscrit le{" "}
-                              {formatDate(
-                                profile.created_at,
-                              )}
+                            <div className="mt-1 text-sm font-black">
+                              {
+                                student.attempts
+                              }
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 sm:w-[330px]">
-                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
-                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                                QCM
-                              </div>
-
-                              <div className="mt-1 text-sm font-black text-white">
-                                {stats?.attempts ||
-                                  0}
-                              </div>
+                          <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                            <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                              Moy.
                             </div>
 
-                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
-                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                                Moyenne
-                              </div>
+                            <div className="mt-1 text-sm font-black text-[#a9c9ff]">
+                              {student.attempts
+                                ? `${student.average}%`
+                                : "—"}
+                            </div>
+                          </div>
 
-                              <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                                {stats?.attempts
-                                  ? `${stats.average}%`
-                                  : "—"}
-                              </div>
+                          <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                            <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                              Statut
                             </div>
 
-                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
-                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                                Statut
-                              </div>
-
-                              <div
-                                className={`mt-1 text-[10px] font-black ${
-                                  online
-                                    ? "text-emerald-300"
-                                    : "text-slate-600"
-                                }`}
-                              >
-                                {online
-                                  ? "EN LIGNE"
-                                  : "HORS LIGNE"}
-                              </div>
+                            <div
+                              className={`mt-1 text-[9px] font-black ${
+                                student.online
+                                  ? "text-emerald-300"
+                                  : "text-slate-600"
+                              }`}
+                            >
+                              {student.online
+                                ? "EN LIGNE"
+                                : "HORS LIGNE"}
                             </div>
                           </div>
                         </div>
-                      );
-                    },
+                      </div>
+                    ),
                   )
                 )}
               </div>
             </div>
 
-            {/* NOUVEAUX INSCRITS */}
+            {/* TOP ACTIFS */}
 
-            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                    Nouvelles inscriptions
-                  </div>
-
-                  <h3 className="mt-2 text-2xl font-black">
-                    Derniers inscrits
-                  </h3>
-                </div>
-
-                <div className="rounded-full bg-[#a9c9ff]/10 px-3 py-1.5 text-[9px] font-black text-[#c5dcff]">
-                  {newUsersLast7Days} cette semaine
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-2">
-                {recentStudents.map(
-                  (student) => (
-                    <div
-                      key={
-                        student.profile.id
-                      }
-                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3"
-                    >
-                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-[10px] font-black text-slate-300">
-                        {initials(
-                          student.profile,
-                        )}
-
-                        {student.online && (
-                          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-white">
-                          {profileName(
-                            student.profile,
-                          )}
-                        </div>
-
-                        <div className="mt-1 text-[9px] text-slate-500">
-                          {formatDate(
-                            student.profile.created_at,
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-[9px] font-black text-[#a9c9ff]">
-                          {student.attempts} QCM
-                        </div>
-
-                        <div className="mt-1 text-[9px] text-slate-600">
-                          {student.online
-                            ? "En ligne"
-                            : "Hors ligne"}
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                )}
-
-                {recentStudents.length ===
-                  0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                    Aucun étudiant inscrit.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ACTIVITE ETUDIANTS */}
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
               <div>
-                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                  Student activity
+                <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
+                  Classement activité
                 </div>
 
                 <h3 className="mt-2 text-2xl font-black">
                   Étudiants les plus actifs
                 </h3>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Basé sur le nombre de QCM réalisés.
+                </p>
               </div>
 
-              <div className="mt-5 space-y-2">
+              <div className="mt-6 space-y-2">
                 {topActiveStudents.map(
-                  (student, index) => (
+                  (
+                    student,
+                    index,
+                  ) => (
                     <div
                       key={
-                        student.profile.id
+                        student.profile
+                          .id
                       }
                       className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-400">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-500">
                         {index + 1}
                       </div>
 
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a9c9ff]/10 text-[10px] font-black text-[#c5dcff]">
+                        {initials(
+                          student.profile,
+                        )}
+                      </div>
+
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-white">
+                        <div className="truncate text-sm font-black">
                           {profileName(
                             student.profile,
                           )}
@@ -1239,10 +1961,6 @@ export default function AdminPage() {
 
                         <div className="mt-1 text-[9px] text-slate-500">
                           {student.attempts} QCM
-                          {student.attempts >
-                          1
-                            ? " réalisés"
-                            : " réalisé"}
                         </div>
                       </div>
 
@@ -1263,114 +1981,10 @@ export default function AdminPage() {
 
                 {topActiveStudents.length ===
                   0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                    Aucune activité QCM.
+                  <div className="rounded-2xl border border-dashed border-white/10 p-7 text-center text-sm text-slate-500">
+                    Pas encore d&apos;activité.
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-              <div>
-                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                  Platform health
-                </div>
-
-                <h3 className="mt-2 text-2xl font-black">
-                  Activité de la communauté
-                </h3>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <div className="rounded-2xl bg-white/[0.025] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">
-                      Étudiants actifs
-                    </span>
-
-                    <span className="font-black text-emerald-300">
-                      {onlineStudentsCount}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-emerald-400"
-                      style={{
-                        width: `${
-                          profiles.length
-                            ? Math.min(
-                                100,
-                                (onlineStudentsCount /
-                                  profiles.length) *
-                                  100,
-                              )
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-white/[0.025] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">
-                      Nouveaux inscrits cette semaine
-                    </span>
-
-                    <span className="font-black text-[#a9c9ff]">
-                      {newUsersLast7Days}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-[#6ea8ff]"
-                      style={{
-                        width: `${
-                          profiles.length
-                            ? Math.min(
-                                100,
-                                (newUsersLast7Days /
-                                  profiles.length) *
-                                  100,
-                              )
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-white/[0.025] p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">
-                      QCM cette semaine
-                    </span>
-
-                    <span className="font-black text-white">
-                      {qcmLast7Days}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                    <div
-                      className="h-full rounded-full bg-white/50"
-                      style={{
-                        width: `${
-                          attempts.length
-                            ? Math.min(
-                                100,
-                                (qcmLast7Days /
-                                  attempts.length) *
-                                  100,
-                              )
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -1427,7 +2041,7 @@ export default function AdminPage() {
 
           <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
             <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              À valider
+              Brouillons
             </div>
 
             <div className="mt-3 text-3xl font-black text-amber-300">
@@ -1435,33 +2049,27 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-1 text-[10px] text-slate-500">
-              {modulesWithDrafts} module
-              {modulesWithDrafts > 1
-                ? "s"
-                : ""}
+              à valider
             </div>
           </div>
 
           <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
             <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Activité QCM
+              Refusées
             </div>
 
-            <div className="mt-3 text-3xl font-black">
-              {attempts.length}
+            <div className="mt-3 text-3xl font-black text-red-300">
+              {rejectedQuestions}
             </div>
 
             <div className="mt-1 text-[10px] text-slate-500">
-              moyenne{" "}
-              {attempts.length
-                ? `${average}%`
-                : "—"}
+              questions
             </div>
           </div>
         </section>
 
         {/* =====================================================
-            ACTIONS
+            OUTILS ADMIN
         ===================================================== */}
 
         <section className="mt-10">
@@ -1485,7 +2093,8 @@ export default function AdminPage() {
                   ?
                 </div>
 
-                {draftQuestions > 0 && (
+                {draftQuestions >
+                  0 && (
                   <span className="rounded-full bg-amber-400/10 px-3 py-1.5 text-[9px] font-black text-amber-300">
                     {draftQuestions} à valider
                   </span>
@@ -1513,7 +2122,7 @@ export default function AdminPage() {
               href="/admin/signalements"
               className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black">
                 !
               </div>
 
@@ -1538,7 +2147,7 @@ export default function AdminPage() {
               href="/publier/cours"
               className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black">
                 +
               </div>
 
@@ -1551,7 +2160,7 @@ export default function AdminPage() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Publie un nouveau support PDF pour un module.
+                Publie un nouveau support PDF.
               </p>
 
               <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
@@ -1563,7 +2172,7 @@ export default function AdminPage() {
               href="/"
               className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black">
                 ↗
               </div>
 
@@ -1576,7 +2185,7 @@ export default function AdminPage() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Retourne à l&apos;interface étudiante.
+                Retourner à l&apos;interface étudiante.
               </p>
 
               <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
@@ -1587,10 +2196,10 @@ export default function AdminPage() {
         </section>
 
         {/* =====================================================
-            QUESTIONS
+            CONTENU RECENT
         ===================================================== */}
 
-        <section className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <section className="mt-10 grid gap-4 lg:grid-cols-2">
           <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
             <div className="flex items-end justify-between">
               <div>
@@ -1612,423 +2221,74 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-6 space-y-2">
+              {recentQuestions.map(
+                (question) => {
+                  const module =
+                    moduleMap.get(
+                      question.module_id,
+                    );
+
+                  return (
+                    <div
+                      key={
+                        question.id
+                      }
+                      className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
+                        {module
+                          ? moduleNumber(
+                              module.name,
+                            )
+                          : "?"}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black">
+                          {
+                            question.question
+                          }
+                        </div>
+
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          {module
+                            ? moduleTitle(
+                                module.name,
+                              )
+                            : "Sans module"}
+                          {" · "}
+                          {formatDate(
+                            question.created_at,
+                          )}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${
+                          question.status ===
+                          "approved"
+                            ? "bg-emerald-400/10 text-emerald-300"
+                            : question.status ===
+                                "draft"
+                              ? "bg-amber-400/10 text-amber-300"
+                              : "bg-red-400/10 text-red-300"
+                        }`}
+                      >
+                        {
+                          question.status
+                        }
+                      </span>
+                    </div>
+                  );
+                },
+              )}
+
               {recentQuestions.length ===
-              0 ? (
+                0 && (
                 <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
                   Aucune question.
                 </div>
-              ) : (
-                recentQuestions.map(
-                  (question) => {
-                    const module =
-                      moduleMap.get(
-                        question.module_id,
-                      );
-
-                    return (
-                      <div
-                        key={
-                          question.id
-                        }
-                        className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
-                          {module
-                            ? moduleNumber(
-                                module.name,
-                              )
-                            : "?"}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-black">
-                            {question.question}
-                          </div>
-
-                          <div className="mt-1 text-[10px] text-slate-500">
-                            {module
-                              ? moduleTitle(
-                                  module.name,
-                                )
-                              : "Sans module"}
-                            {" · "}
-                            {formatDate(
-                              question.created_at,
-                            )}
-                          </div>
-                        </div>
-
-                        <span
-                          className={`shrink-0 rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${
-                            question.status ===
-                            "approved"
-                              ? "bg-emerald-400/10 text-emerald-300"
-                              : question.status ===
-                                  "draft"
-                                ? "bg-amber-400/10 text-amber-300"
-                                : "bg-red-400/10 text-red-300"
-                          }`}
-                        >
-                          {
-                            question.status
-                          }
-                        </span>
-                      </div>
-                    );
-                  },
-                )
               )}
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Database health
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                État du contenu
-              </h2>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Questions validées
-                  </span>
-
-                  <span className="font-black text-emerald-300">
-                    {approvedQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-emerald-400"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (approvedQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Brouillons
-                  </span>
-
-                  <span className="font-black text-amber-300">
-                    {draftQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-amber-300"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (draftQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Questions refusées
-                  </span>
-
-                  <span className="font-black text-red-300">
-                    {rejectedQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-red-400"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (rejectedQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            MODULES
-        ===================================================== */}
-
-        <section className="mt-10">
-          <div className="mb-5">
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Module monitoring
-            </div>
-
-            <h2 className="mt-2 text-2xl font-black">
-              État des modules
-            </h2>
-          </div>
-
-          <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#202d3d]">
-            <div className="divide-y divide-white/[0.06]">
-              {moduleStats.map(
-                (item) => (
-                  <div
-                    key={
-                      item.module.id
-                    }
-                    className="p-5"
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                      <div className="flex items-center gap-4 xl:w-[340px]">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-xs font-black text-[#a9c9ff]">
-                          {moduleNumber(
-                            item.module.name,
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="truncate font-black text-white">
-                            {moduleTitle(
-                              item.module.name,
-                            )}
-                          </div>
-
-                          <div className="mt-1 text-[10px] text-slate-500">
-                            {
-                              item.questions
-                            }{" "}
-                            questions
-                            {" · "}
-                            {
-                              item.courses
-                            }{" "}
-                            cours
-                            {" · "}
-                            {
-                              item.sheets
-                            }{" "}
-                            fiches
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Questions
-                          </div>
-
-                          <div className="mt-1 text-sm font-black">
-                            {
-                              item.questions
-                            }
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Brouillons
-                          </div>
-
-                          <div className="mt-1 text-sm font-black text-amber-300">
-                            {
-                              item.drafts
-                            }
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            QCM
-                          </div>
-
-                          <div className="mt-1 text-sm font-black">
-                            {
-                              item.attempts
-                            }
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Moyenne
-                          </div>
-
-                          <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                            {item.attempts
-                              ? `${item.average}%`
-                              : "—"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Link
-                          href={`/cours/${item.module.id}`}
-                          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                        >
-                          Voir
-                        </Link>
-
-                        <Link
-                          href={`/admin/questions/${item.module.id}`}
-                          className="rounded-xl bg-[#6ea8ff] px-4 py-3 text-xs font-black text-[#122033] transition hover:bg-[#83b5ff]"
-                        >
-                          Gérer
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            ACTIVITE
-        ===================================================== */}
-
-        <section className="mt-10 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                QCM activity
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                Activité récente
-              </h2>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {attempts
-                .slice(0, 6)
-                .map(
-                  (attempt) => {
-                    const module =
-                      moduleMap.get(
-                        attempt.module_id,
-                      );
-
-                    const student =
-                      profileMap.get(
-                        attempt.user_id,
-                      );
-
-                    return (
-                      <div
-                        key={
-                          attempt.id
-                        }
-                        className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
-                          {module
-                            ? moduleNumber(
-                                module.name,
-                              )
-                            : "?"}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-black">
-                            {student
-                              ? profileName(
-                                  student,
-                                )
-                              : "Étudiant"}
-                          </div>
-
-                          <div className="mt-1 truncate text-[10px] text-slate-500">
-                            {module
-                              ? moduleTitle(
-                                  module.name,
-                                )
-                              : "Module"}
-                            {" · "}
-                            {formatDateTime(
-                              attempt.created_at,
-                            )}
-                          </div>
-                        </div>
-
-                        <div
-                          className={`text-lg font-black ${
-                            attempt.percentage >=
-                            80
-                              ? "text-emerald-300"
-                              : attempt.percentage >=
-                                  60
-                                ? "text-[#a9c9ff]"
-                                : "text-red-300"
-                          }`}
-                        >
-                          {
-                            attempt.percentage
-                          }%
-                        </div>
-                      </div>
-                    );
-                  },
-                )}
-
-              {attempts.length ===
-                0 && (
-                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                  Aucun QCM enregistré.
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                  Moyenne globale
-                </div>
-
-                <div className="mt-1 text-xl font-black text-[#a9c9ff]">
-                  {attempts.length
-                    ? `${average}%`
-                    : "—"}
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                  Meilleur score
-                </div>
-
-                <div className="mt-1 text-xl font-black">
-                  {attempts.length
-                    ? `${bestScore}%`
-                    : "—"}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -2048,7 +2308,7 @@ export default function AdminPage() {
                 (course) => {
                   const module =
                     moduleMap.get(
-                      course.module_id ||
+                      course.module_id ??
                         -1,
                     );
 
@@ -2098,45 +2358,197 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
-
-            <Link
-              href="/cours"
-              className="mt-6 flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-            >
-              Voir les cours →
-            </Link>
           </div>
         </section>
 
         {/* =====================================================
-            FOOTER ADMIN
+            ETAT CONTENU
         ===================================================== */}
 
-        <section className="mt-10 rounded-[30px] border border-white/10 bg-[#202d3d] p-6 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
             <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
-                Live monitoring
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                Module monitoring
               </div>
 
-              <div className="mt-2 text-lg font-black">
-                Suivi des étudiants actif
-              </div>
-
-              <div className="mt-1 text-xs leading-5 text-slate-500">
-                La présence est actualisée automatiquement toutes les 30 secondes.
-                Un étudiant est considéré comme actif s&apos;il a utilisé la plateforme
-                durant les 5 dernières minutes.
-              </div>
+              <h2 className="mt-2 text-2xl font-black">
+                État des modules
+              </h2>
             </div>
 
-            <button
-              type="button"
-              onClick={loadUsers}
-              className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-            >
-              Actualiser les étudiants
-            </button>
+            <div className="mt-6 space-y-2">
+              {moduleStats.slice(
+                0,
+                8,
+              ).map(
+                (item) => (
+                  <div
+                    key={
+                      item.module.id
+                    }
+                    className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-[#a9c9ff]">
+                        {moduleNumber(
+                          item.module.name,
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black">
+                          {moduleTitle(
+                            item.module.name,
+                          )}
+                        </div>
+
+                        <div className="mt-1 text-[9px] text-slate-600">
+                          {
+                            item.questions
+                          }{" "}
+                          questions ·{" "}
+                          {
+                            item.courses
+                          }{" "}
+                          cours ·{" "}
+                          {
+                            item.sheets
+                          }{" "}
+                          fiches
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-black text-[#a9c9ff]">
+                          {item.attempts
+                            ? `${item.average}%`
+                            : "—"}
+                        </div>
+
+                        <div className="mt-1 text-[9px] text-slate-600">
+                          moyenne
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                Health
+              </div>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Santé de la plateforme
+              </h2>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <div className="rounded-2xl bg-white/[0.025] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">
+                    Questions validées
+                  </span>
+
+                  <span className="font-black text-emerald-300">
+                    {approvedQuestions}
+                  </span>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-emerald-400"
+                    style={{
+                      width: `${
+                        questions.length
+                          ? (approvedQuestions /
+                              questions.length) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white/[0.025] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">
+                    Brouillons
+                  </span>
+
+                  <span className="font-black text-amber-300">
+                    {draftQuestions}
+                  </span>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-amber-300"
+                    style={{
+                      width: `${
+                        questions.length
+                          ? (draftQuestions /
+                              questions.length) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white/[0.025] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">
+                    Étudiants actifs
+                  </span>
+
+                  <span className="font-black text-emerald-300">
+                    {onlineUsers}
+                  </span>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-emerald-400"
+                    style={{
+                      width: `${
+                        profiles.length
+                          ? Math.min(
+                              100,
+                              (onlineUsers /
+                                profiles.length) *
+                                100,
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-600">
+                      Statut
+                    </div>
+
+                    <div className="mt-1 text-sm font-black text-emerald-300">
+                      Système opérationnel
+                    </div>
+                  </div>
+
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]" />
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
