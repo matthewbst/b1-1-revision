@@ -3,16 +3,12 @@
 :root {
   --background: #182332;
   --foreground: #ffffff;
-
   --panel: #202d3d;
   --panel-2: #28384b;
   --panel-3: #30445a;
-
   --border: rgba(255, 255, 255, 0.12);
-
   --muted: #8e9cad;
   --muted-light: #b8c3cf;
-
   --blue: #6ea8ff;
   --blue-light: #a9c9ff;
   --cyan: #8bdde8;
@@ -32,7 +28,7 @@ body {
       transparent 34%
     ),
     #182332;
-  color: var(--foreground);
+  color: white;
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -51,10 +47,6 @@ select {
   font: inherit;
 }
 
-/* =========================================================
-   THÈME GLOBAL
-   ========================================================= */
-
 .site-theme {
   min-height: 100vh;
   background:
@@ -66,7 +58,9 @@ select {
     #182332;
 }
 
-/* anciens fonds clairs */
+/* =========================================================
+   COULEURS TAILWIND
+========================================================= */
 
 .site-theme .bg-gray-50,
 .site-theme .bg-gray-100,
@@ -74,8 +68,6 @@ select {
 .site-theme .bg-slate-100 {
   background-color: #182332 !important;
 }
-
-/* cartes */
 
 .site-theme .bg-white {
   background-color: #202d3d !important;
@@ -99,14 +91,12 @@ select {
   background-color: #28384b !important;
 }
 
-/* textes */
-
 .site-theme .text-gray-900,
 .site-theme .text-gray-800,
 .site-theme .text-gray-700,
 .site-theme .text-slate-900,
 .site-theme .text-slate-800 {
-  color: #ffffff !important;
+  color: #fff !important;
 }
 
 .site-theme .text-gray-600,
@@ -124,8 +114,6 @@ select {
   color: #b1bdc9 !important;
 }
 
-/* bordures */
-
 .site-theme .border-gray-200,
 .site-theme .border-gray-300,
 .site-theme .border-slate-200,
@@ -133,7 +121,9 @@ select {
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-/* champs */
+/* =========================================================
+   FORMULAIRES
+========================================================= */
 
 .site-theme input,
 .site-theme textarea,
@@ -156,7 +146,9 @@ select {
   box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.08);
 }
 
-/* scrollbar */
+/* =========================================================
+   SCROLLBAR
+========================================================= */
 
 ::-webkit-scrollbar {
   width: 9px;
@@ -174,4 +166,83 @@ select {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #596b80;
+}
+
+/* =========================================================
+   IMAGES / SVG
+========================================================= */
+
+img,
+svg {
+  max-width: 100%;
+}
+
+/* =========================================================
+   OPTIMISATION MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+  html {
+    background: #182332;
+    scroll-behavior: auto;
+  }
+
+  body {
+    background: #182332;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+    On retire seulement les effets graphiques lourds
+    sur téléphone.
+  */
+
+  [class*="blur-"] {
+    filter: none !important;
+  }
+
+  [class*="drop-shadow-"] {
+    filter: none !important;
+  }
+
+  /*
+    Les gros éléments décoratifs fixes sont masqués
+    sur mobile.
+  */
+
+  .pointer-events-none.fixed {
+    display: none !important;
+  }
+
+  /*
+    On réduit les effets de transition.
+  */
+
+  * {
+    transition-duration: 0.08s !important;
+  }
+
+  /*
+    Empêche les animations de déplacement.
+  */
+
+  .hover\:-translate-y-1:hover {
+    transform: none !important;
+  }
+}
+
+/* =========================================================
+   PETITS TELEPHONES
+========================================================= */
+
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
 }
