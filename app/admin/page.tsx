@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_ID =
@@ -40,7 +44,10 @@ type Sheet = {
 
 type Attempt = {
   id: number;
+  user_id: string;
   module_id: number;
+  score: number;
+  total: number;
   percentage: number;
   created_at: string;
 };
@@ -58,7 +65,11 @@ type Presence = {
 };
 
 function moduleNumber(name: string) {
-  return name.match(/^Module\s+(\d+)/)?.[1] || "";
+  return (
+    name.match(
+      /^Module\s+(\d+)/,
+    )?.[1] || ""
+  );
 }
 
 function moduleTitle(name: string) {
@@ -92,7 +103,7 @@ function formatDateTime(value: string) {
   );
 }
 
-function getProfileName(
+function profileName(
   profile: Profile,
 ) {
   if (
@@ -114,44 +125,46 @@ function getProfileName(
   return "Utilisateur";
 }
 
+function initials(
+  profile: Profile,
+) {
+  const name = profileName(profile);
+
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 export default function AdminPage() {
-  const [modules, setModules] = useState<
-    Module[]
-  >([]);
+  const [modules, setModules] =
+    useState<Module[]>([]);
 
-  const [questions, setQuestions] = useState<
-    Question[]
-  >([]);
+  const [questions, setQuestions] =
+    useState<Question[]>([]);
 
-  const [courses, setCourses] = useState<
-    Course[]
-  >([]);
+  const [courses, setCourses] =
+    useState<Course[]>([]);
 
-  const [sheets, setSheets] = useState<
-    Sheet[]
-  >([]);
+  const [sheets, setSheets] =
+    useState<Sheet[]>([]);
 
-  const [attempts, setAttempts] = useState<
-    Attempt[]
-  >([]);
+  const [attempts, setAttempts] =
+    useState<Attempt[]>([]);
 
-  const [profiles, setProfiles] = useState<
-    Profile[]
-  >([]);
-
-  const [totalUsers, setTotalUsers] =
-    useState(0);
-
-  const [onlineUsers, setOnlineUsers] =
-    useState(0);
+  const [profiles, setProfiles] =
+    useState<Profile[]>([]);
 
   const [onlineUserIds, setOnlineUserIds] =
     useState<string[]>([]);
 
-  const [usersLoading, setUsersLoading] =
+  const [loading, setLoading] =
     useState(true);
 
-  const [loading, setLoading] =
+  const [usersLoading, setUsersLoading] =
     useState(true);
 
   const [authorized, setAuthorized] =
@@ -162,6 +175,82 @@ export default function AdminPage() {
 
   const [usersError, setUsersError] =
     useState("");
+
+  const [userSearch, setUserSearch] =
+    useState("");
+
+  const [
+    showOnlyOnline,
+    setShowOnlyOnline,
+  ] = useState(false);
+
+  async function loadUsers() {
+    setUsersLoading(true);
+    setUsersError("");
+
+    const onlineSince =
+      new Date(
+        Date.now() -
+          ONLINE_WINDOW_MS,
+      ).toISOString();
+
+    const [
+      profilesResult,
+      presenceResult,
+    ] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select(
+          "id,email,display_name,created_at",
+        )
+        .order("created_at", {
+          ascending: false,
+        }),
+
+      supabase
+        .from("user_presence")
+        .select(
+          "user_id,last_seen_at",
+        )
+        .gte(
+          "last_seen_at",
+          onlineSince,
+        ),
+    ]);
+
+    if (profilesResult.error) {
+      setUsersError(
+        profilesResult.error.message,
+      );
+    }
+
+    if (presenceResult.error) {
+      setUsersError(
+        presenceResult.error.message,
+      );
+    }
+
+    setProfiles(
+      profilesResult.data || [],
+    );
+
+    const onlineIds = Array.from(
+      new Set(
+        (
+          presenceResult.data ||
+          []
+        ).map(
+          (item) => item.user_id,
+        ),
+      ),
+    );
+
+    setOnlineUserIds(
+      onlineIds,
+    );
+
+    setUsersLoading(false);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -202,7 +291,7 @@ export default function AdminPage() {
         supabase
           .from("modules")
           .select(
-            "id, name, description",
+            "id,name,description",
           )
           .order("id", {
             ascending: true,
@@ -211,7 +300,7 @@ export default function AdminPage() {
         supabase
           .from("questions")
           .select(
-            "id, module_id, question, status, created_at",
+            "id,module_id,question,status,created_at",
           )
           .order("created_at", {
             ascending: false,
@@ -221,7 +310,7 @@ export default function AdminPage() {
         supabase
           .from("course_files")
           .select(
-            "id, module_id, title, created_at",
+            "id,module_id,title,created_at",
           )
           .order("created_at", {
             ascending: false,
@@ -230,7 +319,7 @@ export default function AdminPage() {
         supabase
           .from("revision_sheets")
           .select(
-            "id, module_id, title, created_at",
+            "id,module_id,title,created_at",
           )
           .order("created_at", {
             ascending: false,
@@ -239,12 +328,12 @@ export default function AdminPage() {
         supabase
           .from("qcm_attempts")
           .select(
-            "id, module_id, percentage, created_at",
+            "id,user_id,module_id,score,total,percentage,created_at",
           )
           .order("created_at", {
             ascending: false,
           })
-          .limit(1000),
+          .limit(2000),
       ]);
 
       if (modulesResult.error) {
@@ -297,119 +386,16 @@ export default function AdminPage() {
     }
 
     load();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadUsers() {
-      setUsersLoading(true);
-      setUsersError("");
-
-      const onlineSince = new Date(
-        Date.now() -
-          ONLINE_WINDOW_MS,
-      ).toISOString();
-
-      const [
-        profilesResult,
-        countResult,
-        presenceResult,
-      ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select(
-            "id, email, display_name, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(8),
-
-        supabase
-          .from("profiles")
-          .select("id", {
-            count: "exact",
-            head: true,
-          }),
-
-        supabase
-          .from("user_presence")
-          .select(
-            "user_id, last_seen_at",
-          )
-          .gte(
-            "last_seen_at",
-            onlineSince,
-          ),
-      ]);
-
-      if (!mounted) {
-        return;
-      }
-
-      if (profilesResult.error) {
-        setUsersError(
-          profilesResult.error.message,
-        );
-      } else if (countResult.error) {
-        setUsersError(
-          countResult.error.message,
-        );
-      } else if (presenceResult.error) {
-        setUsersError(
-          presenceResult.error.message,
-        );
-      }
-
-      const presenceRows =
-        (presenceResult.data ||
-          []) as Presence[];
-
-      const uniqueOnlineIds =
-        Array.from(
-          new Set(
-            presenceRows.map(
-              (item) => item.user_id,
-            ),
-          ),
-        );
-
-      setProfiles(
-        (profilesResult.data ||
-          []) as Profile[],
-      );
-
-      setTotalUsers(
-        countResult.count || 0,
-      );
-
-      setOnlineUserIds(
-        uniqueOnlineIds,
-      );
-
-      setOnlineUsers(
-        uniqueOnlineIds.length,
-      );
-
-      setUsersLoading(false);
-    }
-
     loadUsers();
 
-    const interval =
-      setInterval(
-        loadUsers,
-        30_000,
-      );
+    const usersInterval =
+      setInterval(() => {
+        loadUsers();
+      }, 30_000);
 
     return () => {
       mounted = false;
-      clearInterval(interval);
+      clearInterval(usersInterval);
     };
   }, []);
 
@@ -514,7 +500,8 @@ export default function AdminPage() {
         module,
         questions:
           moduleQuestions.length,
-        drafts: moduleDrafts,
+        drafts:
+          moduleDrafts,
         courses:
           moduleCourses.length,
         sheets:
@@ -544,7 +531,205 @@ export default function AdminPage() {
       (item) => item.drafts > 0,
     ).length;
 
-  if (loading || !authorized) {
+  const moduleMap = useMemo(
+    () =>
+      new Map(
+        modules.map((module) => [
+          module.id,
+          module,
+        ]),
+      ),
+    [modules],
+  );
+
+  const profileMap = useMemo(
+    () =>
+      new Map(
+        profiles.map((profile) => [
+          profile.id,
+          profile,
+        ]),
+      ),
+    [profiles],
+  );
+
+  const isOnline = (
+    userId: string,
+  ) =>
+    onlineUserIds.includes(
+      userId,
+    );
+
+  const newUsersLast7Days =
+    useMemo(() => {
+      const since =
+        Date.now() -
+        7 *
+          24 *
+          60 *
+          60 *
+          1000;
+
+      return profiles.filter(
+        (profile) =>
+          new Date(
+            profile.created_at,
+          ).getTime() >= since,
+      ).length;
+    }, [profiles]);
+
+  const qcmLast7Days =
+    useMemo(() => {
+      const since =
+        Date.now() -
+        7 *
+          24 *
+          60 *
+          60 *
+          1000;
+
+      return attempts.filter(
+        (attempt) =>
+          new Date(
+            attempt.created_at,
+          ).getTime() >= since,
+      ).length;
+    }, [attempts]);
+
+  const searchedProfiles =
+    useMemo(() => {
+      const search =
+        userSearch
+          .trim()
+          .toLowerCase();
+
+      return profiles
+        .filter((profile) => {
+          if (
+            showOnlyOnline &&
+            !isOnline(profile.id)
+          ) {
+            return false;
+          }
+
+          if (!search) {
+            return true;
+          }
+
+          const haystack =
+            `${profileName(profile)} ${
+              profile.email || ""
+            }`.toLowerCase();
+
+          return haystack.includes(
+            search,
+          );
+        })
+        .slice(0, 30);
+    }, [
+      profiles,
+      userSearch,
+      showOnlyOnline,
+      onlineUserIds,
+    ]);
+
+  const studentStats =
+    useMemo(() => {
+      return profiles.map(
+        (profile) => {
+          const userAttempts =
+            attempts.filter(
+              (attempt) =>
+                attempt.user_id ===
+                profile.id,
+            );
+
+          const userAverage =
+            userAttempts.length > 0
+              ? Math.round(
+                  userAttempts.reduce(
+                    (sum, attempt) =>
+                      sum +
+                      attempt.percentage,
+                    0,
+                  ) /
+                    userAttempts.length,
+                )
+              : 0;
+
+          const lastAttempt =
+            userAttempts[0] ||
+            null;
+
+          const best =
+            userAttempts.length > 0
+              ? Math.max(
+                  ...userAttempts.map(
+                    (attempt) =>
+                      attempt.percentage,
+                  ),
+                )
+              : 0;
+
+          return {
+            profile,
+            attempts:
+              userAttempts.length,
+            average:
+              userAverage,
+            best,
+            lastAttempt,
+            online: isOnline(
+              profile.id,
+            ),
+          };
+        },
+      );
+    }, [
+      profiles,
+      attempts,
+      onlineUserIds,
+    ]);
+
+  const recentStudents =
+    studentStats.slice(
+      0,
+      6,
+    );
+
+  const topActiveStudents =
+    [...studentStats]
+      .sort(
+        (a, b) =>
+          b.attempts -
+          a.attempts,
+      )
+      .slice(0, 5);
+
+  const onlineStudentsCount =
+    onlineUserIds.length;
+
+  const inactiveStudentsCount =
+    Math.max(
+      0,
+      profiles.length -
+        onlineStudentsCount,
+    );
+
+  const activityByStudent =
+    new Map(
+      studentStats.map(
+        (item) => [
+          item.profile.id,
+          item,
+        ],
+      ),
+    );
+
+  if (
+    loading ||
+    !authorized
+  ) {
     return (
       <main className="min-h-screen bg-[#182332] text-white">
         <div className="flex min-h-screen items-center justify-center px-4">
@@ -592,6 +777,7 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
+
                 Administration center
               </div>
 
@@ -600,8 +786,8 @@ export default function AdminPage() {
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Gère les contenus, surveille les questions et
-                visualise l&apos;activité de la plateforme Part-66 B1.1.
+                Gère les contenus, surveille les étudiants et visualise
+                l&apos;activité de la plateforme Part-66 B1.1.
               </p>
             </div>
 
@@ -628,215 +814,573 @@ export default function AdminPage() {
             UTILISATEURS
         ===================================================== */}
 
-        <section className="mt-5 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-          {/* ===================================================
-              COMPTEURS
-          =================================================== */}
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+        <section className="mt-5">
+          <div className="mb-5">
             <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Utilisateurs
+              Student monitoring
             </div>
 
             <h2 className="mt-2 text-2xl font-black">
-              Activité étudiants
+              Gestion des étudiants
             </h2>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
-                      Total inscrits
-                    </div>
-
-                    <div className="mt-2 text-4xl font-black text-white">
-                      {usersLoading
-                        ? "—"
-                        : totalUsers}
-                    </div>
-
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      comptes créés
-                    </div>
-                  </div>
-
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
-                    👥
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
-                      Actifs maintenant
-                    </div>
-
-                    <div className="mt-2 text-4xl font-black text-emerald-300">
-                      {usersLoading
-                        ? "—"
-                        : onlineUsers}
-                    </div>
-
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      actifs sur les 5 dernières minutes
-                    </div>
-                  </div>
-
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-300/10 text-xl text-emerald-300">
-                    ●
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-              <div>
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Mise à jour
-                </div>
-
-                <div className="mt-1 text-xs font-bold text-slate-400">
-                  Automatique toutes les 30 secondes
-                </div>
-              </div>
-
-              <div className="h-2 w-2 rounded-full bg-emerald-400" />
-            </div>
-
-            {usersError && (
-              <div className="mt-4 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3 text-xs leading-5 text-red-200">
-                {usersError}
-              </div>
-            )}
+            <p className="mt-2 max-w-2xl text-sm text-slate-500">
+              Suis les inscriptions et l&apos;activité récente des étudiants.
+            </p>
           </div>
 
-          {/* ===================================================
-              DERNIERS INSCRITS
-          =================================================== */}
+          {/* KPI ETUDIANTS */}
 
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                  Nouveaux comptes
-                </div>
-
-                <h2 className="mt-2 text-2xl font-black">
-                  Derniers inscrits
-                </h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Total inscrits
               </div>
 
-              <div className="text-right">
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Total
-                </div>
+              <div className="mt-3 text-3xl font-black">
+                {usersLoading
+                  ? "—"
+                  : profiles.length}
+              </div>
 
-                <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                  {usersLoading
-                    ? "—"
-                    : totalUsers}
-                </div>
+              <div className="mt-1 text-[10px] text-slate-500">
+                comptes étudiants
               </div>
             </div>
 
-            <div className="mt-6 space-y-2">
-              {usersLoading ? (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-slate-500">
-                  Chargement des utilisateurs…
-                </div>
-              ) : profiles.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
-                  <div className="text-2xl">
-                    👤
+            <div className="rounded-[28px] border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
+              <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+                En ligne
+              </div>
+
+              <div className="mt-3 text-3xl font-black text-emerald-300">
+                {usersLoading
+                  ? "—"
+                  : onlineStudentsCount}
+              </div>
+
+              <div className="mt-1 text-[10px] text-slate-500">
+                actifs sur 5 min
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Nouveaux
+              </div>
+
+              <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
+                {usersLoading
+                  ? "—"
+                  : newUsersLast7Days}
+              </div>
+
+              <div className="mt-1 text-[10px] text-slate-500">
+                ces 7 derniers jours
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                QCM cette semaine
+              </div>
+
+              <div className="mt-3 text-3xl font-black text-white">
+                {qcmLast7Days}
+              </div>
+
+              <div className="mt-1 text-[10px] text-slate-500">
+                entraînements
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Inactifs
+              </div>
+
+              <div className="mt-3 text-3xl font-black text-slate-300">
+                {usersLoading
+                  ? "—"
+                  : inactiveStudentsCount}
+              </div>
+
+              <div className="mt-1 text-[10px] text-slate-500">
+                pas actifs depuis 5 min
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Moyenne globale
+              </div>
+
+              <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
+                {attempts.length
+                  ? `${average}%`
+                  : "—"}
+              </div>
+
+              <div className="mt-1 text-[10px] text-slate-500">
+                tous les QCM
+              </div>
+            </div>
+          </div>
+
+          {/* RECHERCHE + LISTE */}
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                    Utilisateurs
                   </div>
 
-                  <div className="mt-3 text-sm font-black text-white">
-                    Aucun inscrit trouvé
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-500">
-                    Les nouveaux comptes apparaîtront ici.
-                  </div>
+                  <h3 className="mt-2 text-2xl font-black">
+                    Liste des étudiants
+                  </h3>
                 </div>
-              ) : (
-                profiles.map(
-                  (profile) => {
-                    const isOnline =
-                      onlineUserIds.includes(
-                        profile.id,
+
+                <div className="text-xs font-bold text-slate-600">
+                  {searchedProfiles.length} affiché
+                  {searchedProfiles.length > 1
+                    ? "s"
+                    : ""}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="relative">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-600"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="6.5"
+                    />
+
+                    <path d="m16 16 4 4" />
+                  </svg>
+
+                  <input
+                    value={userSearch}
+                    onChange={(event) =>
+                      setUserSearch(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Rechercher un étudiant ou un email..."
+                    className="w-full rounded-2xl border border-white/10 bg-[#182332] py-4 pl-12 pr-4 text-sm font-medium text-white outline-none placeholder:text-slate-600 focus:border-[#a9c9ff]/20"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowOnlyOnline(
+                      (value) =>
+                        !value,
+                    )
+                  }
+                  className={`rounded-2xl border px-5 py-4 text-xs font-black transition ${
+                    showOnlyOnline
+                      ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-300"
+                      : "border-white/10 bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] hover:text-white"
+                  }`}
+                >
+                  ● En ligne uniquement
+                </button>
+              </div>
+
+              {usersError && (
+                <div className="mt-4 rounded-2xl border border-red-300/20 bg-red-300/10 p-4 text-xs leading-6 text-red-200">
+                  Impossible de charger les utilisateurs :{" "}
+                  {usersError}
+                </div>
+              )}
+
+              <div className="mt-5 space-y-2">
+                {usersLoading ? (
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-slate-500">
+                    Chargement des étudiants...
+                  </div>
+                ) : searchedProfiles.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center">
+                    <div className="text-2xl">
+                      👤
+                    </div>
+
+                    <div className="mt-3 text-sm font-black">
+                      Aucun étudiant trouvé
+                    </div>
+
+                    <div className="mt-1 text-xs text-slate-600">
+                      Modifie ta recherche.
+                    </div>
+                  </div>
+                ) : (
+                  searchedProfiles.map(
+                    (profile) => {
+                      const stats =
+                        activityByStudent.get(
+                          profile.id,
+                        );
+
+                      const online =
+                        isOnline(
+                          profile.id,
+                        );
+
+                      return (
+                        <div
+                          key={
+                            profile.id
+                          }
+                          className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 sm:flex-row sm:items-center"
+                        >
+                          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-xs font-black text-[#c5dcff]">
+                            {initials(
+                              profile,
+                            )}
+
+                            {online && (
+                              <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-black text-white">
+                              {profileName(
+                                profile,
+                              )}
+                            </div>
+
+                            <div className="mt-1 truncate text-[10px] text-slate-500">
+                              {profile.email ||
+                                "Email non disponible"}
+                            </div>
+
+                            <div className="mt-1 text-[9px] text-slate-600">
+                              Inscrit le{" "}
+                              {formatDate(
+                                profile.created_at,
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 sm:w-[330px]">
+                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                                QCM
+                              </div>
+
+                              <div className="mt-1 text-sm font-black text-white">
+                                {stats?.attempts ||
+                                  0}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                                Moyenne
+                              </div>
+
+                              <div className="mt-1 text-sm font-black text-[#a9c9ff]">
+                                {stats?.attempts
+                                  ? `${stats.average}%`
+                                  : "—"}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-white/[0.025] p-3 text-center">
+                              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                                Statut
+                              </div>
+
+                              <div
+                                className={`mt-1 text-[10px] font-black ${
+                                  online
+                                    ? "text-emerald-300"
+                                    : "text-slate-600"
+                                }`}
+                              >
+                                {online
+                                  ? "EN LIGNE"
+                                  : "HORS LIGNE"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       );
+                    },
+                  )
+                )}
+              </div>
+            </div>
 
-                    return (
-                      <div
-                        key={profile.id}
-                        className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4"
-                      >
-                        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a9c9ff]/10 text-sm font-black text-[#c5dcff]">
-                          {getProfileName(
-                            profile,
-                          )
-                            .slice(0, 1)
-                            .toUpperCase()}
+            {/* NOUVEAUX INSCRITS */}
 
-                          {isOnline && (
-                            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                    Nouvelles inscriptions
+                  </div>
+
+                  <h3 className="mt-2 text-2xl font-black">
+                    Derniers inscrits
+                  </h3>
+                </div>
+
+                <div className="rounded-full bg-[#a9c9ff]/10 px-3 py-1.5 text-[9px] font-black text-[#c5dcff]">
+                  {newUsersLast7Days} cette semaine
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {recentStudents.map(
+                  (student) => (
+                    <div
+                      key={
+                        student.profile.id
+                      }
+                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3"
+                    >
+                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-[10px] font-black text-slate-300">
+                        {initials(
+                          student.profile,
+                        )}
+
+                        {student.online && (
+                          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black text-white">
+                          {profileName(
+                            student.profile,
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-black text-white">
-                            {getProfileName(
-                              profile,
-                            )}
-                          </div>
-
-                          <div className="mt-0.5 truncate text-[10px] text-slate-500">
-                            {profile.email ||
-                              "Email non disponible"}
-                          </div>
-                        </div>
-
-                        <div className="hidden shrink-0 text-right sm:block">
-                          <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                            Inscrit le
-                          </div>
-
-                          <div className="mt-1 text-[10px] font-bold text-slate-400">
-                            {formatDate(
-                              profile.created_at,
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="shrink-0">
-                          {isOnline ? (
-                            <span className="rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-300">
-                              En ligne
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                              Hors ligne
-                            </span>
+                        <div className="mt-1 text-[9px] text-slate-500">
+                          {formatDate(
+                            student.profile.created_at,
                           )}
                         </div>
                       </div>
-                    );
-                  },
-                )
-              )}
+
+                      <div className="text-right">
+                        <div className="text-[9px] font-black text-[#a9c9ff]">
+                          {student.attempts} QCM
+                        </div>
+
+                        <div className="mt-1 text-[9px] text-slate-600">
+                          {student.online
+                            ? "En ligne"
+                            : "Hors ligne"}
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                )}
+
+                {recentStudents.length ===
+                  0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
+                    Aucun étudiant inscrit.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ACTIVITE ETUDIANTS */}
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                  Student activity
+                </div>
+
+                <h3 className="mt-2 text-2xl font-black">
+                  Étudiants les plus actifs
+                </h3>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {topActiveStudents.map(
+                  (student, index) => (
+                    <div
+                      key={
+                        student.profile.id
+                      }
+                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-400">
+                        {index + 1}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black text-white">
+                          {profileName(
+                            student.profile,
+                          )}
+                        </div>
+
+                        <div className="mt-1 text-[9px] text-slate-500">
+                          {student.attempts} QCM
+                          {student.attempts >
+                          1
+                            ? " réalisés"
+                            : " réalisé"}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-black text-[#a9c9ff]">
+                          {student.attempts
+                            ? `${student.average}%`
+                            : "—"}
+                        </div>
+
+                        <div className="mt-1 text-[9px] text-slate-600">
+                          moyenne
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                )}
+
+                {topActiveStudents.length ===
+                  0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
+                    Aucune activité QCM.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                  Platform health
+                </div>
+
+                <h3 className="mt-2 text-2xl font-black">
+                  Activité de la communauté
+                </h3>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <div className="rounded-2xl bg-white/[0.025] p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-400">
+                      Étudiants actifs
+                    </span>
+
+                    <span className="font-black text-emerald-300">
+                      {onlineStudentsCount}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className="h-full rounded-full bg-emerald-400"
+                      style={{
+                        width: `${
+                          profiles.length
+                            ? Math.min(
+                                100,
+                                (onlineStudentsCount /
+                                  profiles.length) *
+                                  100,
+                              )
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.025] p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-400">
+                      Nouveaux inscrits cette semaine
+                    </span>
+
+                    <span className="font-black text-[#a9c9ff]">
+                      {newUsersLast7Days}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className="h-full rounded-full bg-[#6ea8ff]"
+                      style={{
+                        width: `${
+                          profiles.length
+                            ? Math.min(
+                                100,
+                                (newUsersLast7Days /
+                                  profiles.length) *
+                                  100,
+                              )
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.025] p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-400">
+                      QCM cette semaine
+                    </span>
+
+                    <span className="font-black text-white">
+                      {qcmLast7Days}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className="h-full rounded-full bg-white/50"
+                      style={{
+                        width: `${
+                          attempts.length
+                            ? Math.min(
+                                100,
+                                (qcmLast7Days /
+                                  attempts.length) *
+                                  100,
+                              )
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* =====================================================
-            KPI
+            KPI CONTENU
         ===================================================== */}
 
-        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <section className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
             <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               Modules
@@ -1043,7 +1587,7 @@ export default function AdminPage() {
         </section>
 
         {/* =====================================================
-            QUESTIONS / CONTENU
+            QUESTIONS
         ===================================================== */}
 
         <section className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -1077,15 +1621,15 @@ export default function AdminPage() {
                 recentQuestions.map(
                   (question) => {
                     const module =
-                      modules.find(
-                        (item) =>
-                          item.id ===
-                          question.module_id,
+                      moduleMap.get(
+                        question.module_id,
                       );
 
                     return (
                       <div
-                        key={question.id}
+                        key={
+                          question.id
+                        }
                         className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
@@ -1125,7 +1669,9 @@ export default function AdminPage() {
                                 : "bg-red-400/10 text-red-300"
                           }`}
                         >
-                          {question.status}
+                          {
+                            question.status
+                          }
                         </span>
                       </div>
                     );
@@ -1251,7 +1797,9 @@ export default function AdminPage() {
               {moduleStats.map(
                 (item) => (
                   <div
-                    key={item.module.id}
+                    key={
+                      item.module.id
+                    }
                     className="p-5"
                   >
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
@@ -1270,11 +1818,20 @@ export default function AdminPage() {
                           </div>
 
                           <div className="mt-1 text-[10px] text-slate-500">
-                            {item.questions} questions
+                            {
+                              item.questions
+                            }{" "}
+                            questions
                             {" · "}
-                            {item.courses} cours
+                            {
+                              item.courses
+                            }{" "}
+                            cours
                             {" · "}
-                            {item.sheets} fiches
+                            {
+                              item.sheets
+                            }{" "}
+                            fiches
                           </div>
                         </div>
                       </div>
@@ -1286,7 +1843,9 @@ export default function AdminPage() {
                           </div>
 
                           <div className="mt-1 text-sm font-black">
-                            {item.questions}
+                            {
+                              item.questions
+                            }
                           </div>
                         </div>
 
@@ -1296,7 +1855,9 @@ export default function AdminPage() {
                           </div>
 
                           <div className="mt-1 text-sm font-black text-amber-300">
-                            {item.drafts}
+                            {
+                              item.drafts
+                            }
                           </div>
                         </div>
 
@@ -1306,7 +1867,9 @@ export default function AdminPage() {
                           </div>
 
                           <div className="mt-1 text-sm font-black">
-                            {item.attempts}
+                            {
+                              item.attempts
+                            }
                           </div>
                         </div>
 
@@ -1365,61 +1928,77 @@ export default function AdminPage() {
             <div className="mt-6 space-y-2">
               {attempts
                 .slice(0, 6)
-                .map((attempt) => {
-                  const module =
-                    modules.find(
-                      (item) =>
-                        item.id ===
+                .map(
+                  (attempt) => {
+                    const module =
+                      moduleMap.get(
                         attempt.module_id,
-                    );
+                      );
 
-                  return (
-                    <div
-                      key={attempt.id}
-                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
-                        {module
-                          ? moduleNumber(
-                              module.name,
-                            )
-                          : "?"}
-                      </div>
+                    const student =
+                      profileMap.get(
+                        attempt.user_id,
+                      );
 
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black">
+                    return (
+                      <div
+                        key={
+                          attempt.id
+                        }
+                        className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
                           {module
-                            ? moduleTitle(
+                            ? moduleNumber(
                                 module.name,
                               )
-                            : "Module"}
+                            : "?"}
                         </div>
 
-                        <div className="mt-1 text-[10px] text-slate-500">
-                          {formatDateTime(
-                            attempt.created_at,
-                          )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-black">
+                            {student
+                              ? profileName(
+                                  student,
+                                )
+                              : "Étudiant"}
+                          </div>
+
+                          <div className="mt-1 truncate text-[10px] text-slate-500">
+                            {module
+                              ? moduleTitle(
+                                  module.name,
+                                )
+                              : "Module"}
+                            {" · "}
+                            {formatDateTime(
+                              attempt.created_at,
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`text-lg font-black ${
+                            attempt.percentage >=
+                            80
+                              ? "text-emerald-300"
+                              : attempt.percentage >=
+                                  60
+                                ? "text-[#a9c9ff]"
+                                : "text-red-300"
+                          }`}
+                        >
+                          {
+                            attempt.percentage
+                          }%
                         </div>
                       </div>
+                    );
+                  },
+                )}
 
-                      <div
-                        className={`text-lg font-black ${
-                          attempt.percentage >=
-                          80
-                            ? "text-emerald-300"
-                            : attempt.percentage >=
-                                60
-                              ? "text-[#a9c9ff]"
-                              : "text-red-300"
-                        }`}
-                      >
-                        {attempt.percentage}%
-                      </div>
-                    </div>
-                  );
-                })}
-
-              {attempts.length === 0 && (
+              {attempts.length ===
+                0 && (
                 <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
                   Aucun QCM enregistré.
                 </div>
@@ -1468,15 +2047,16 @@ export default function AdminPage() {
               {recentCourses.map(
                 (course) => {
                   const module =
-                    modules.find(
-                      (item) =>
-                        item.id ===
-                        course.module_id,
+                    moduleMap.get(
+                      course.module_id ||
+                        -1,
                     );
 
                   return (
                     <div
-                      key={course.id}
+                      key={
+                        course.id
+                      }
                       className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
@@ -1489,7 +2069,9 @@ export default function AdminPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-black">
-                          {course.title}
+                          {
+                            course.title
+                          }
                         </div>
 
                         <div className="mt-1 text-[10px] text-slate-500">
@@ -1527,87 +2109,34 @@ export default function AdminPage() {
         </section>
 
         {/* =====================================================
-            RESUME UTILISATEURS
+            FOOTER ADMIN
         ===================================================== */}
 
-        <section className="mt-10 rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="mt-10 rounded-[30px] border border-white/10 bg-[#202d3d] p-6 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+              <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
                 Live monitoring
               </div>
 
-              <h2 className="mt-2 text-2xl font-black">
-                Présence sur la plateforme
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
-              {onlineUsers} utilisateur
-              {onlineUsers > 1
-                ? "s"
-                : ""}{" "}
-              actif
-              {onlineUsers > 1
-                ? "s"
-                : ""}
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                Inscrits
+              <div className="mt-2 text-lg font-black">
+                Suivi des étudiants actif
               </div>
 
-              <div className="mt-2 text-3xl font-black">
-                {totalUsers}
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                La présence est actualisée automatiquement toutes les 30 secondes.
+                Un étudiant est considéré comme actif s&apos;il a utilisé la plateforme
+                durant les 5 dernières minutes.
               </div>
             </div>
 
-            <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                En ligne
-              </div>
-
-              <div className="mt-2 text-3xl font-black text-emerald-300">
-                {onlineUsers}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                Inactifs
-              </div>
-
-              <div className="mt-2 text-3xl font-black">
-                {Math.max(
-                  0,
-                  totalUsers -
-                    onlineUsers,
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Définition
-                </div>
-
-                <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Un utilisateur est considéré comme actif s&apos;il a
-                  utilisé la plateforme durant les 5 dernières minutes.
-                </div>
-              </div>
-
-              <div className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-600">
-                Refresh 30s
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={loadUsers}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+            >
+              Actualiser les étudiants
+            </button>
           </div>
         </section>
 
