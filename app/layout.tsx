@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/app/components/Navbar";
-import RequireAuth from "@/app/components/RequireAuth";
 
 export const metadata: Metadata = {
   title: "Part-66 B1.1",
@@ -20,7 +19,7 @@ export default function RootLayout({
         <Navbar />
 
         <div className="site-theme">
-          <RequireAuth>{children}</RequireAuth>
+          {children}
         </div>
       </body>
     </html>

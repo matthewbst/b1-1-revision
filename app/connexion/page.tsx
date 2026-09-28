@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -85,7 +85,7 @@ function LockIcon() {
   );
 }
 
-export default function ConnexionPage() {
+function ConnexionContent() {
   const searchParams = useSearchParams();
 
   const redirectTo = getSafeRedirect(
@@ -220,7 +220,7 @@ export default function ConnexionPage() {
 
       <div className="relative mx-auto max-w-[1250px] px-4 py-6 sm:px-6 lg:px-8">
         {/* =====================================================
-            MESSAGE D'ACCÈS — TOUJOURS EN HAUT
+            MESSAGE D'ACCÈS
         ===================================================== */}
 
         {cameFromProtectedPage && (
@@ -492,6 +492,19 @@ export default function ConnexionPage() {
               </button>
             </form>
 
+            {/* =================================================
+                INFO
+            ================================================= */}
+
+            {cameFromProtectedPage && (
+              <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-center">
+                <p className="text-xs leading-5 text-slate-500">
+                  Après connexion, tu seras automatiquement
+                  redirigé vers la page que tu voulais ouvrir.
+                </p>
+              </div>
+            )}
+
             <div className="mt-7 border-t border-white/[0.07] pt-6 text-center">
               <Link
                 href="/"
@@ -504,5 +517,25 @@ export default function ConnexionPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ConnexionPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-[calc(100vh-68px)] items-center justify-center bg-[#182332] text-white">
+          <div className="rounded-3xl border border-white/10 bg-[#202d3d] px-6 py-5 text-center">
+            <div className="mx-auto h-3 w-3 rounded-full bg-[#a9c9ff]" />
+
+            <div className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+              Chargement...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ConnexionContent />
+    </Suspense>
   );
 }
