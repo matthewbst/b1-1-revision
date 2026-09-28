@@ -16,6 +16,7 @@ const protectedRoutes = [
   "/recherche",
   "/proposer-question",
   "/compte",
+  "/notifications",
   "/publier",
   "/admin",
 ];
@@ -55,10 +56,14 @@ function copySupabaseResponse(
     "expires",
     "pragma",
   ]) {
-    const value = source.headers.get(header);
+    const value =
+      source.headers.get(header);
 
     if (value) {
-      destination.headers.set(header, value);
+      destination.headers.set(
+        header,
+        value,
+      );
     }
   }
 
@@ -68,75 +73,82 @@ function copySupabaseResponse(
 export async function updateSession(
   request: NextRequest,
 ) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse =
+    NextResponse.next({
+      request,
+    });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+  const supabase =
+    createServerClient(
+      process.env
+        .NEXT_PUBLIC_SUPABASE_URL!,
+      process.env
+        .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
 
-        setAll(cookiesToSet) {
-          for (const {
-            name,
-            value,
-          } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
+          setAll(cookiesToSet) {
+            for (const {
+              name,
+              value,
+            } of cookiesToSet) {
+              request.cookies.set(
+                name,
+                value,
+              );
+            }
 
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+            supabaseResponse =
+              NextResponse.next({
+                request,
+              });
 
-          for (const {
-            name,
-            value,
-            options,
-          } of cookiesToSet) {
-            supabaseResponse.cookies.set(
+            for (const {
               name,
               value,
               options,
-            );
-          }
+            } of cookiesToSet) {
+              supabaseResponse.cookies.set(
+                name,
+                value,
+                options,
+              );
+            }
+          },
         },
       },
-    },
-  );
-
-  /*
-    Vérification réelle du JWT.
-  */
+    );
 
   const {
     data: claimsData,
   } = await supabase.auth.getClaims();
 
   const userId =
-    typeof claimsData?.claims?.sub === "string"
+    typeof claimsData?.claims?.sub ===
+    "string"
       ? claimsData.claims.sub
       : null;
 
-  const pathname = request.nextUrl.pathname;
+  const pathname =
+    request.nextUrl.pathname;
 
-  /* =========================================================
-     API QCM
-  ========================================================= */
-
-  if (isProtectedApi(pathname) && !userId) {
-    const response = NextResponse.json(
-      {
-        error: "Authentification requise.",
-      },
-      {
-        status: 401,
-      },
-    );
+  if (
+    isProtectedApi(pathname) &&
+    !userId
+  ) {
+    const response =
+      NextResponse.json(
+        {
+          error:
+            "Authentification requise.",
+        },
+        {
+          status: 401,
+        },
+      );
 
     return copySupabaseResponse(
       supabaseResponse,
@@ -144,15 +156,12 @@ export async function updateSession(
     );
   }
 
-  /* =========================================================
-     PAGES PROTÉGÉES
-  ========================================================= */
-
   if (
     isProtectedRoute(pathname) &&
     !userId
   ) {
-    const url = request.nextUrl.clone();
+    const url =
+      request.nextUrl.clone();
 
     url.pathname = "/connexion";
 
@@ -170,13 +179,10 @@ export async function updateSession(
     );
   }
 
-  /* =========================================================
-     ADMIN
-  ========================================================= */
-
   if (isAdminRoute(pathname)) {
     if (!userId) {
-      const url = request.nextUrl.clone();
+      const url =
+        request.nextUrl.clone();
 
       url.pathname = "/connexion";
 
@@ -195,7 +201,8 @@ export async function updateSession(
     }
 
     if (userId !== ADMIN_ID) {
-      const url = request.nextUrl.clone();
+      const url =
+        request.nextUrl.clone();
 
       url.pathname = "/";
 

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_ID = "dcbeb72a-4f4a-4169-beab-53da1b3babfa";
+const ADMIN_ID =
+  "dcbeb72a-4f4a-4169-beab-53da1b3babfa";
 
 type Module = {
   id: number;
@@ -49,12 +50,15 @@ function moduleTitle(name: string) {
   return name.replace(/^Module\s+\d+\s+—\s*/, "");
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(
+    "fr-FR",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
 }
 
 export default function AdminPage() {
@@ -70,6 +74,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError("");
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -96,35 +103,59 @@ export default function AdminPage() {
         supabase
           .from("modules")
           .select("id, name, description")
-          .order("id", { ascending: true }),
+          .order("id", {
+            ascending: true,
+          }),
 
         supabase
           .from("questions")
           .select(
             "id, module_id, question, status, created_at",
           )
-          .order("created_at", { ascending: false })
+          .order("created_at", {
+            ascending: false,
+          })
           .limit(2000),
 
         supabase
           .from("course_files")
-          .select("id, module_id, title, created_at")
-          .order("created_at", { ascending: false }),
+          .select(
+            "id, module_id, title, created_at",
+          )
+          .order("created_at", {
+            ascending: false,
+          }),
 
         supabase
           .from("revision_sheets")
-          .select("id, module_id, title, created_at")
-          .order("created_at", { ascending: false }),
+          .select(
+            "id, module_id, title, created_at",
+          )
+          .order("created_at", {
+            ascending: false,
+          }),
 
         supabase
           .from("qcm_attempts")
-          .select("id, module_id, percentage, created_at")
-          .order("created_at", { ascending: false })
+          .select(
+            "id, module_id, percentage, created_at",
+          )
+          .order("created_at", {
+            ascending: false,
+          })
           .limit(1000),
       ]);
 
       if (modulesResult.error) {
         setError(modulesResult.error.message);
+      } else if (questionsResult.error) {
+        setError(questionsResult.error.message);
+      } else if (coursesResult.error) {
+        setError(coursesResult.error.message);
+      } else if (sheetsResult.error) {
+        setError(sheetsResult.error.message);
+      } else if (attemptsResult.error) {
+        setError(attemptsResult.error.message);
       }
 
       setModules(modulesResult.data || []);
@@ -140,75 +171,136 @@ export default function AdminPage() {
   }, []);
 
   const approvedQuestions = questions.filter(
-    (question) => question.status === "approved",
+    (question) =>
+      question.status === "approved",
   ).length;
 
   const draftQuestions = questions.filter(
-    (question) => question.status === "draft",
+    (question) =>
+      question.status === "draft",
   ).length;
 
   const rejectedQuestions = questions.filter(
-    (question) => question.status === "rejected",
+    (question) =>
+      question.status === "rejected",
   ).length;
 
-  const average =
-    attempts.length > 0
-      ? Math.round(
-          attempts.reduce(
-            (sum, attempt) => sum + attempt.percentage,
-            0,
-          ) / attempts.length,
-        )
-      : 0;
+  const average = useMemo(() => {
+    if (attempts.length === 0) {
+      return 0;
+    }
+
+    return Math.round(
+      attempts.reduce(
+        (sum, attempt) =>
+          sum + attempt.percentage,
+        0,
+      ) / attempts.length,
+    );
+  }, [attempts]);
+
+  const bestScore = useMemo(() => {
+    if (attempts.length === 0) {
+      return 0;
+    }
+
+    return Math.max(
+      ...attempts.map(
+        (attempt) =>
+          attempt.percentage,
+      ),
+    );
+  }, [attempts]);
 
   const moduleStats = useMemo(() => {
     return modules.map((module) => {
-      const moduleQuestions = questions.filter(
-        (question) => question.module_id === module.id,
-      );
+      const moduleQuestions =
+        questions.filter(
+          (question) =>
+            question.module_id ===
+            module.id,
+        );
 
-      const moduleCourses = courses.filter(
-        (course) => course.module_id === module.id,
-      );
+      const moduleCourses =
+        courses.filter(
+          (course) =>
+            course.module_id ===
+            module.id,
+        );
 
-      const moduleSheets = sheets.filter(
-        (sheet) => sheet.module_id === module.id,
-      );
+      const moduleSheets =
+        sheets.filter(
+          (sheet) =>
+            sheet.module_id ===
+            module.id,
+        );
 
-      const moduleAttempts = attempts.filter(
-        (attempt) => attempt.module_id === module.id,
-      );
+      const moduleAttempts =
+        attempts.filter(
+          (attempt) =>
+            attempt.module_id ===
+            module.id,
+        );
 
       const moduleAverage =
         moduleAttempts.length > 0
           ? Math.round(
               moduleAttempts.reduce(
-                (sum, attempt) => sum + attempt.percentage,
+                (sum, attempt) =>
+                  sum +
+                  attempt.percentage,
                 0,
-              ) / moduleAttempts.length,
+              ) /
+                moduleAttempts.length,
             )
           : 0;
 
+      const moduleDrafts =
+        moduleQuestions.filter(
+          (question) =>
+            question.status ===
+            "draft",
+        ).length;
+
       return {
         module,
-        questions: moduleQuestions.length,
-        courses: moduleCourses.length,
-        sheets: moduleSheets.length,
-        attempts: moduleAttempts.length,
-        average: moduleAverage,
+        questions:
+          moduleQuestions.length,
+        drafts: moduleDrafts,
+        courses:
+          moduleCourses.length,
+        sheets:
+          moduleSheets.length,
+        attempts:
+          moduleAttempts.length,
+        average:
+          moduleAverage,
       };
     });
-  }, [modules, questions, courses, sheets, attempts]);
+  }, [
+    modules,
+    questions,
+    courses,
+    sheets,
+    attempts,
+  ]);
 
-  const recentQuestions = questions.slice(0, 8);
+  const recentQuestions =
+    questions.slice(0, 7);
 
-  const recentCourses = courses.slice(0, 6);
+  const recentCourses =
+    courses.slice(0, 6);
+
+  const modulesWithDrafts =
+    moduleStats.filter(
+      (item) => item.drafts > 0,
+    ).length;
 
   if (loading || !authorized) {
     return (
       <main className="min-h-screen bg-[#182332] text-white">
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="rounded-2xl border border-white/10 bg-[#202d3d] px-6 py-4 text-sm font-semibold text-slate-300">
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className="rounded-3xl border border-white/10 bg-[#202d3d] px-6 py-5 text-sm font-semibold text-slate-300">
             Chargement du centre administration...
           </div>
         </div>
@@ -218,51 +310,55 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#182332] text-white">
-      {/* BACKGROUND */}
+      {/* =====================================================
+          BACKGROUND
+      ===================================================== */}
 
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-1/2 top-[-100px] h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
+        <div className="absolute left-1/2 top-[-120px] h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
 
-        <div className="absolute left-[-120px] top-[40%] h-[450px] w-[450px] rounded-full bg-slate-200/[0.02] blur-[120px]" />
+        <div className="absolute left-[-140px] top-[45%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
-        <div className="absolute right-[-120px] top-[25%] h-[450px] w-[450px] rounded-full bg-white/[0.02] blur-[120px]" />
+        <div className="absolute right-[-140px] top-[20%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
         <div
           className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.55) 1px, transparent 1px)",
+              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
             backgroundSize: "50px 50px",
           }}
         />
       </div>
 
       <div className="relative mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
-        {/* HEADER */}
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
 
-        <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.15)] sm:p-9">
-          <div className="absolute right-[-100px] top-[-100px] h-[320px] w-[320px] rounded-full bg-white/[0.025] blur-[90px]" />
+        <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.15)] sm:p-10">
+          <div className="absolute right-[-100px] top-[-100px] h-[320px] w-[320px] rounded-full bg-white/[0.03] blur-[90px]" />
 
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Administration
+                Administration center
               </div>
 
-              <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+              <h1 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] text-white sm:text-5xl">
                 Centre de contrôle
               </h1>
 
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                Vue d&apos;ensemble de la plateforme Part-66 B1.1,
-                des contenus et de l&apos;activité QCM.
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+                Gère les contenus, surveille les questions et
+                visualise l&apos;activité de la plateforme Part-66 B1.1.
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/[0.10] px-5 py-4">
               <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
-                Statut système
+                Système
               </div>
 
               <div className="mt-1 flex items-center gap-2 text-sm font-black text-emerald-300">
@@ -273,49 +369,49 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* ERREUR */}
-
         {error && (
           <div className="mt-5 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3 text-sm font-semibold text-red-200">
             {error}
           </div>
         )}
 
-        {/* STATS PRINCIPALES */}
+        {/* =====================================================
+            KPI
+        ===================================================== */}
 
-        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
+        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               Modules
             </div>
 
-            <div className="mt-3 text-3xl font-black text-white">
+            <div className="mt-3 text-3xl font-black">
               {modules.length}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               Cours
             </div>
 
-            <div className="mt-3 text-3xl font-black text-white">
+            <div className="mt-3 text-3xl font-black">
               {courses.length}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               Fiches
             </div>
 
-            <div className="mt-3 text-3xl font-black text-white">
+            <div className="mt-3 text-3xl font-black">
               {sheets.length}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               Questions
             </div>
 
@@ -324,16 +420,31 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-1 text-[10px] text-slate-500">
-              {approvedQuestions} approuvées · {draftQuestions} brouillons
+              {approvedQuestions} validées
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
-              QCM
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              À valider
             </div>
 
-            <div className="mt-3 text-3xl font-black text-white">
+            <div className="mt-3 text-3xl font-black text-amber-300">
+              {draftQuestions}
+            </div>
+
+            <div className="mt-1 text-[10px] text-slate-500">
+              {modulesWithDrafts} module
+              {modulesWithDrafts > 1 ? "s" : ""}
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
+            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+              Activité QCM
+            </div>
+
+            <div className="mt-3 text-3xl font-black">
               {attempts.length}
             </div>
 
@@ -343,7 +454,9 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* ACCES RAPIDES */}
+        {/* =====================================================
+            ACTIONS
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -351,55 +464,38 @@ export default function AdminPage() {
               Control center
             </div>
 
-            <h2 className="mt-2 text-2xl font-black text-white">
-              Accès rapides
+            <h2 className="mt-2 text-2xl font-black">
+              Outils d&apos;administration
             </h2>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Link
               href="/admin/questions"
-              className="group rounded-3xl border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
+              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
-                ?
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-xl font-black text-[#a9c9ff]">
+                  ?
+                </div>
+
+                {draftQuestions > 0 && (
+                  <span className="rounded-full bg-amber-400/10 px-3 py-1.5 text-[9px] font-black text-amber-300">
+                    {draftQuestions} à valider
+                  </span>
+                )}
               </div>
 
               <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
                 Content
               </div>
 
-              <h3 className="mt-1 text-xl font-black text-white">
+              <h3 className="mt-1 text-xl font-black">
                 Questions
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Créer, modifier, valider et gérer les questions.
-              </p>
-
-              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Gérer →
-              </div>
-            </Link>
-
-            <Link
-              href="/admin/signalements"
-              className="group rounded-3xl border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
-                !
-              </div>
-
-              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                Moderation
-              </div>
-
-              <h3 className="mt-1 text-xl font-black text-white">
-                Signalements
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Vérifie les problèmes signalés sur les questions.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Gérer, modifier et valider la banque de questions.
               </p>
 
               <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
@@ -408,35 +504,60 @@ export default function AdminPage() {
             </Link>
 
             <Link
-              href="/cours"
-              className="group rounded-3xl border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
+              href="/admin/signalements"
+              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
-                ▤
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
+                !
+              </div>
+
+              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
+                Moderation
+              </div>
+
+              <h3 className="mt-1 text-xl font-black">
+                Signalements
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Consulte les problèmes signalés par les étudiants.
+              </p>
+
+              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
+                Ouvrir →
+              </div>
+            </Link>
+
+            <Link
+              href="/publier/cours"
+              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
+                +
               </div>
 
               <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
                 Formation
               </div>
 
-              <h3 className="mt-1 text-xl font-black text-white">
-                Cours
+              <h3 className="mt-1 text-xl font-black">
+                Ajouter un cours
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Consulte les supports disponibles sur la plateforme.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Publie un nouveau support PDF pour un module.
               </p>
 
               <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Voir →
+                Publier →
               </div>
             </Link>
 
             <Link
               href="/"
-              className="group rounded-3xl border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
+              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
                 ↗
               </div>
 
@@ -444,12 +565,12 @@ export default function AdminPage() {
                 Platform
               </div>
 
-              <h3 className="mt-1 text-xl font-black text-white">
+              <h3 className="mt-1 text-xl font-black">
                 Voir le site
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Retourne sur l&apos;interface étudiante.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Retourne à l&apos;interface étudiante.
               </p>
 
               <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
@@ -459,24 +580,26 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* QUESTIONS RECENTES */}
+        {/* =====================================================
+            QUESTIONS / CONTENU
+        ===================================================== */}
 
         <section className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-6">
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
             <div className="flex items-end justify-between">
               <div>
                 <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
                   Question database
                 </div>
 
-                <h2 className="mt-2 text-2xl font-black text-white">
+                <h2 className="mt-2 text-2xl font-black">
                   Questions récentes
                 </h2>
               </div>
 
               <Link
                 href="/admin/questions"
-                className="text-xs font-bold text-slate-500 hover:text-white"
+                className="text-xs font-black text-slate-500 hover:text-white"
               >
                 Toutes →
               </Link>
@@ -488,78 +611,83 @@ export default function AdminPage() {
                   Aucune question.
                 </div>
               ) : (
-                recentQuestions.map((question) => {
-                  const module = modules.find(
-                    (item) => item.id === question.module_id,
-                  );
+                recentQuestions.map(
+                  (question) => {
+                    const module =
+                      modules.find(
+                        (item) =>
+                          item.id ===
+                          question.module_id,
+                      );
 
-                  return (
-                    <div
-                      key={question.id}
-                      className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
-                        {module
-                          ? moduleNumber(module.name)
-                          : "?"}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-white">
-                          {question.question}
-                        </div>
-
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-                          {module && (
-                            <span>
-                              {moduleTitle(module.name)}
-                            </span>
-                          )}
-
-                          <span>·</span>
-
-                          <span>
-                            {formatDate(question.created_at)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black ${
-                          question.status === "approved"
-                            ? "bg-emerald-400/10 text-emerald-300"
-                            : question.status === "draft"
-                              ? "bg-white/[0.06] text-slate-300"
-                              : "bg-red-400/10 text-red-300"
-                        }`}
+                    return (
+                      <div
+                        key={question.id}
+                        className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
                       >
-                        {question.status}
-                      </span>
-                    </div>
-                  );
-                })
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
+                          {module
+                            ? moduleNumber(
+                                module.name,
+                              )
+                            : "?"}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-black">
+                            {question.question}
+                          </div>
+
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            {module
+                              ? moduleTitle(
+                                  module.name,
+                                )
+                              : "Sans module"}
+                            {" · "}
+                            {formatDate(
+                              question.created_at,
+                            )}
+                          </div>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${
+                            question.status ===
+                            "approved"
+                              ? "bg-emerald-400/10 text-emerald-300"
+                              : question.status ===
+                                  "draft"
+                                ? "bg-amber-400/10 text-amber-300"
+                                : "bg-red-400/10 text-red-300"
+                          }`}
+                        >
+                          {question.status}
+                        </span>
+                      </div>
+                    );
+                  },
+                )
               )}
             </div>
           </div>
 
-          {/* CONTENU */}
-
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] p-6">
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Content overview
+                Database health
               </div>
 
-              <h2 className="mt-2 text-2xl font-black text-white">
-                Répartition
+              <h2 className="mt-2 text-2xl font-black">
+                État du contenu
               </h2>
             </div>
 
             <div className="mt-6 space-y-3">
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
+              <div className="rounded-2xl bg-white/[0.025] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">
-                    Questions approuvées
+                  <span className="text-xs font-semibold text-slate-400">
+                    Questions validées
                   </span>
 
                   <span className="font-black text-emerald-300">
@@ -583,20 +711,20 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
+              <div className="rounded-2xl bg-white/[0.025] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">
+                  <span className="text-xs font-semibold text-slate-400">
                     Brouillons
                   </span>
 
-                  <span className="font-black text-slate-200">
+                  <span className="font-black text-amber-300">
                     {draftQuestions}
                   </span>
                 </div>
 
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
                   <div
-                    className="h-full rounded-full bg-slate-400"
+                    className="h-full rounded-full bg-amber-300"
                     style={{
                       width: `${
                         questions.length
@@ -610,10 +738,10 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
+              <div className="rounded-2xl bg-white/[0.025] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">
-                    Refusées
+                  <span className="text-xs font-semibold text-slate-400">
+                    Questions refusées
                   </span>
 
                   <span className="font-black text-red-300">
@@ -640,7 +768,9 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* MODULES */}
+        {/* =====================================================
+            MODULES
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -648,152 +778,287 @@ export default function AdminPage() {
               Module monitoring
             </div>
 
-            <h2 className="mt-2 text-2xl font-black text-white">
+            <h2 className="mt-2 text-2xl font-black">
               État des modules
             </h2>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#202d3d]">
+          <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#202d3d]">
             <div className="divide-y divide-white/[0.06]">
-              {moduleStats.map((item) => (
-                <div
-                  key={item.module.id}
-                  className="p-5"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                    <div className="flex items-center gap-4 lg:w-[350px]">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-xs font-black text-slate-200">
-                        {moduleNumber(item.module.name)}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="truncate font-black text-white">
-                          {moduleTitle(item.module.name)}
+              {moduleStats.map(
+                (item) => (
+                  <div
+                    key={item.module.id}
+                    className="p-5"
+                  >
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                      <div className="flex items-center gap-4 xl:w-[340px]">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-xs font-black text-[#a9c9ff]">
+                          {moduleNumber(
+                            item.module.name,
+                          )}
                         </div>
 
-                        <div className="mt-1 text-[10px] text-slate-500">
-                          {item.courses} cours · {item.sheets} fiches
-                        </div>
-                      </div>
-                    </div>
+                        <div className="min-w-0">
+                          <div className="truncate font-black text-white">
+                            {moduleTitle(
+                              item.module.name,
+                            )}
+                          </div>
 
-                    <div className="grid flex-1 grid-cols-3 gap-2">
-                      <div className="rounded-xl bg-white/[0.03] p-3">
-                        <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                          Questions
-                        </div>
-
-                        <div className="mt-1 text-sm font-black text-white">
-                          {item.questions}
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            {item.questions} questions
+                            {" · "}
+                            {item.courses} cours
+                            {" · "}
+                            {item.sheets} fiches
+                          </div>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-white/[0.03] p-3">
-                        <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                          QCM
+                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="rounded-xl bg-white/[0.025] p-3">
+                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                            Questions
+                          </div>
+
+                          <div className="mt-1 text-sm font-black">
+                            {item.questions}
+                          </div>
                         </div>
 
-                        <div className="mt-1 text-sm font-black text-white">
-                          {item.attempts}
+                        <div className="rounded-xl bg-white/[0.025] p-3">
+                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                            Brouillons
+                          </div>
+
+                          <div className="mt-1 text-sm font-black text-amber-300">
+                            {item.drafts}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white/[0.025] p-3">
+                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                            QCM
+                          </div>
+
+                          <div className="mt-1 text-sm font-black">
+                            {item.attempts}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white/[0.025] p-3">
+                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
+                            Moyenne
+                          </div>
+
+                          <div className="mt-1 text-sm font-black text-[#a9c9ff]">
+                            {item.attempts
+                              ? `${item.average}%`
+                              : "—"}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-white/[0.03] p-3">
-                        <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                          Moyenne
-                        </div>
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/cours/${item.module.id}`}
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                        >
+                          Voir
+                        </Link>
 
-                        <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                          {item.attempts
-                            ? `${item.average}%`
-                            : "—"}
-                        </div>
+                        <Link
+                          href={`/admin/questions/${item.module.id}`}
+                          className="rounded-xl bg-[#6ea8ff] px-4 py-3 text-xs font-black text-[#122033] transition hover:bg-[#83b5ff]"
+                        >
+                          Gérer
+                        </Link>
                       </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/cours/${item.module.id}`}
-                        className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-bold text-slate-300 hover:bg-white/[0.08] hover:text-white"
-                      >
-                        Voir
-                      </Link>
-
-                      <Link
-                        href={`/admin/questions/${item.module.id}`}
-                        className="rounded-xl bg-[#6ea8ff] px-4 py-3 text-xs font-black text-[#122033] hover:bg-[#83b5ff]"
-                      >
-                        Questions
-                      </Link>
                     </div>
                   </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           </div>
         </section>
 
-        {/* COURS RECENTS */}
+        {/* =====================================================
+            ACTIVITE
+        ===================================================== */}
 
-        <section className="mt-10 rounded-3xl border border-white/10 bg-[#202d3d] p-6">
-          <div className="flex items-end justify-between">
+        <section className="mt-10 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                QCM activity
+              </div>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Activité récente
+              </h2>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              {attempts.slice(0, 6).map(
+                (attempt) => {
+                  const module =
+                    modules.find(
+                      (item) =>
+                        item.id ===
+                        attempt.module_id,
+                    );
+
+                  return (
+                    <div
+                      key={attempt.id}
+                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
+                        {module
+                          ? moduleNumber(
+                              module.name,
+                            )
+                          : "?"}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black">
+                          {module
+                            ? moduleTitle(
+                                module.name,
+                              )
+                            : "Module"}
+                        </div>
+
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          {formatDate(
+                            attempt.created_at,
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`text-lg font-black ${
+                          attempt.percentage >=
+                          80
+                            ? "text-emerald-300"
+                            : attempt.percentage >=
+                                60
+                              ? "text-[#a9c9ff]"
+                              : "text-red-300"
+                        }`}
+                      >
+                        {attempt.percentage}%
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+
+              {attempts.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
+                  Aucun QCM enregistré.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-white/[0.025] p-4">
+                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
+                  Moyenne globale
+                </div>
+
+                <div className="mt-1 text-xl font-black text-[#a9c9ff]">
+                  {attempts.length
+                    ? `${average}%`
+                    : "—"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white/[0.025] p-4">
+                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
+                  Meilleur score
+                </div>
+
+                <div className="mt-1 text-xl font-black">
+                  {attempts.length
+                    ? `${bestScore}%`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
                 Latest content
               </div>
 
-              <h2 className="mt-2 text-2xl font-black text-white">
-                Cours ajoutés récemment
+              <h2 className="mt-2 text-2xl font-black">
+                Derniers cours ajoutés
               </h2>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              {recentCourses.map(
+                (course) => {
+                  const module =
+                    modules.find(
+                      (item) =>
+                        item.id ===
+                        course.module_id,
+                    );
+
+                  return (
+                    <div
+                      key={course.id}
+                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
+                        {module
+                          ? moduleNumber(
+                              module.name,
+                            )
+                          : "—"}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black">
+                          {course.title}
+                        </div>
+
+                        <div className="mt-1 text-[10px] text-slate-500">
+                          {module
+                            ? moduleTitle(
+                                module.name,
+                              )
+                            : "Sans module"}
+                          {" · "}
+                          {formatDate(
+                            course.created_at,
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+
+              {recentCourses.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
+                  Aucun cours disponible.
+                </div>
+              )}
             </div>
 
             <Link
               href="/cours"
-              className="text-xs font-bold text-slate-500 hover:text-white"
+              className="mt-6 flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
             >
               Voir les cours →
             </Link>
-          </div>
-
-          <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {recentCourses.map((course) => {
-              const module = modules.find(
-                (item) => item.id === course.module_id,
-              );
-
-              return (
-                <div
-                  key={course.id}
-                  className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
-                      {module
-                        ? moduleNumber(module.name)
-                        : "—"}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-black text-white">
-                        {course.title}
-                      </div>
-
-                      <div className="mt-1 text-[10px] text-slate-500">
-                        {module
-                          ? moduleTitle(module.name)
-                          : "Sans module"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {recentCourses.length === 0 && (
-              <div className="text-sm text-slate-500">
-                Aucun cours disponible.
-              </div>
-            )}
           </div>
         </section>
 

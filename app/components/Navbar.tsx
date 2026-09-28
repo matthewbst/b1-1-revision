@@ -16,6 +16,7 @@ type IconName =
   | "chart"
   | "search"
   | "plus"
+  | "bell"
   | "user"
   | "admin";
 
@@ -103,6 +104,14 @@ function NavIcon({
         </svg>
       );
 
+    case "bell":
+      return (
+        <svg {...common}>
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        </svg>
+      );
+
     case "user":
       return (
         <svg {...common}>
@@ -174,11 +183,6 @@ export default function Navbar() {
     let mounted = true;
 
     async function checkUser() {
-      /*
-        getSession() évite un appel réseau juste pour afficher
-        l'état du bouton compte/admin.
-      */
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -237,14 +241,14 @@ export default function Navbar() {
     setMenuOpen(false);
   }
 
+  const notificationsActive =
+    pathname === "/notifications";
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#182332]/95 backdrop-blur-xl">
       <div className="mx-auto max-w-[1500px] px-3 sm:px-6 lg:px-8">
         <div className="flex min-h-[68px] items-center gap-3">
-          {/* =====================================================
-              LOGO
-          ===================================================== */}
-
+          {/* LOGO */}
           <Link
             href="/"
             onClick={closeMenu}
@@ -272,10 +276,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* =====================================================
-              NAVIGATION DESKTOP
-          ===================================================== */}
-
+          {/* NAVIGATION DESKTOP */}
           <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
             {navItems.map((item) => {
               const active = isActive(item.href);
@@ -301,17 +302,11 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* =====================================================
-              ESPACE
-          ===================================================== */}
-
           <div className="flex-1" />
 
-          {/* =====================================================
-              ACTIONS DROITE
-          ===================================================== */}
-
+          {/* ACTIONS DROITE */}
           <div className="flex shrink-0 items-center gap-2">
+            {/* ADMIN */}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -322,11 +317,35 @@ export default function Navbar() {
                     : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
                 }`}
               >
-                <NavIcon name="admin" size={16} />
+                <NavIcon
+                  name="admin"
+                  size={16}
+                />
+
                 <span>Mode admin</span>
               </Link>
             )}
 
+            {/* NOTIFICATIONS */}
+            {connected && (
+              <Link
+                href="/notifications"
+                onClick={closeMenu}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+                  notificationsActive
+                    ? "border-[#a9c9ff]/30 bg-[#a9c9ff]/10 text-[#c5dcff]"
+                    : "border-white/10 bg-[#202d3d] text-slate-300 hover:bg-[#28384b] hover:text-white"
+                }`}
+                aria-label="Notifications"
+              >
+                <NavIcon
+                  name="bell"
+                  size={18}
+                />
+              </Link>
+            )}
+
+            {/* COMPTE */}
             <Link
               href={
                 connected
@@ -334,20 +353,24 @@ export default function Navbar() {
                   : "/connexion"
               }
               onClick={closeMenu}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#202d3d] text-slate-300 transition-colors hover:bg-[#28384b] hover:text-white"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${
+                pathname === "/compte"
+                  ? "border-[#a9c9ff]/30 bg-[#a9c9ff]/10 text-[#c5dcff]"
+                  : "border-white/10 bg-[#202d3d] text-slate-300 hover:bg-[#28384b] hover:text-white"
+              }`}
               aria-label={
                 connected
                   ? "Mon compte"
                   : "Connexion"
               }
             >
-              <NavIcon name="user" size={18} />
+              <NavIcon
+                name="user"
+                size={18}
+              />
             </Link>
 
-            {/* =================================================
-                MENU MOBILE
-            ================================================= */}
-
+            {/* MENU MOBILE */}
             <button
               type="button"
               onClick={() =>
@@ -366,10 +389,7 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* =======================================================
-            MENU MOBILE
-        ======================================================= */}
-
+        {/* MENU MOBILE */}
         {menuOpen && (
           <div className="border-t border-white/[0.07] pb-4 pt-3 lg:hidden">
             <nav className="grid gap-1">
@@ -397,6 +417,27 @@ export default function Navbar() {
                 );
               })}
 
+              {/* NOTIFICATIONS MOBILE */}
+              {connected && (
+                <Link
+                  href="/notifications"
+                  onClick={closeMenu}
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-black ${
+                    notificationsActive
+                      ? "bg-white/[0.08] text-white"
+                      : "text-slate-400"
+                  }`}
+                >
+                  <NavIcon
+                    name="bell"
+                    size={18}
+                  />
+
+                  <span>Notifications</span>
+                </Link>
+              )}
+
+              {/* ADMIN MOBILE */}
               {isAdmin && (
                 <Link
                   href="/admin"
