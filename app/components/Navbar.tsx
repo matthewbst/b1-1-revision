@@ -166,7 +166,7 @@ const navItems = [
     icon: "search" as IconName,
   },
   {
-    href: "/proposer-question",
+    href: "/proposer",
     label: "Proposer",
     icon: "plus" as IconName,
   },
@@ -175,9 +175,14 @@ const navItems = [
 export default function Navbar() {
   const pathname = usePathname();
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const [isAdmin, setIsAdmin] =
+    useState(false);
+
+  const [connected, setConnected] =
+    useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -185,7 +190,8 @@ export default function Navbar() {
     async function checkUser() {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } =
+        await supabase.auth.getSession();
 
       if (!mounted) {
         return;
@@ -201,16 +207,23 @@ export default function Navbar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!mounted) {
-          return;
-        }
+    } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (!mounted) {
+            return;
+          }
 
-        setConnected(Boolean(session?.user));
-        setIsAdmin(session?.user?.id === ADMIN_ID);
-      },
-    );
+          setConnected(
+            Boolean(session?.user),
+          );
+
+          setIsAdmin(
+            session?.user?.id ===
+              ADMIN_ID,
+          );
+        },
+      );
 
     return () => {
       mounted = false;
@@ -228,6 +241,17 @@ export default function Navbar() {
         pathname === "/progression" ||
         pathname === "/difficultes" ||
         pathname === "/compte"
+      );
+    }
+
+    if (href === "/proposer") {
+      return (
+        pathname === "/proposer" ||
+        pathname.startsWith(
+          "/proposer/",
+        ) ||
+        pathname ===
+          "/proposer-question"
       );
     }
 
@@ -249,6 +273,7 @@ export default function Navbar() {
       <div className="mx-auto max-w-[1500px] px-3 sm:px-6 lg:px-8">
         <div className="flex min-h-[68px] items-center gap-3">
           {/* LOGO */}
+
           <Link
             href="/"
             onClick={closeMenu}
@@ -277,9 +302,11 @@ export default function Navbar() {
           </Link>
 
           {/* NAVIGATION DESKTOP */}
+
           <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
             {navItems.map((item) => {
-              const active = isActive(item.href);
+              const active =
+                isActive(item.href);
 
               return (
                 <Link
@@ -296,7 +323,9 @@ export default function Navbar() {
                     size={16}
                   />
 
-                  <span>{item.label}</span>
+                  <span>
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
@@ -305,14 +334,18 @@ export default function Navbar() {
           <div className="flex-1" />
 
           {/* ACTIONS DROITE */}
+
           <div className="flex shrink-0 items-center gap-2">
             {/* ADMIN */}
+
             {isAdmin && (
               <Link
                 href="/admin"
                 onClick={closeMenu}
                 className={`hidden items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-black transition-colors sm:flex ${
-                  pathname.startsWith("/admin")
+                  pathname.startsWith(
+                    "/admin",
+                  )
                     ? "border-[#a9c9ff]/30 bg-[#a9c9ff]/10 text-[#c5dcff]"
                     : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white"
                 }`}
@@ -322,11 +355,14 @@ export default function Navbar() {
                   size={16}
                 />
 
-                <span>Mode admin</span>
+                <span>
+                  Mode admin
+                </span>
               </Link>
             )}
 
             {/* NOTIFICATIONS */}
+
             {connected && (
               <Link
                 href="/notifications"
@@ -346,6 +382,7 @@ export default function Navbar() {
             )}
 
             {/* COMPTE */}
+
             <Link
               href={
                 connected
@@ -371,14 +408,19 @@ export default function Navbar() {
             </Link>
 
             {/* MENU MOBILE */}
+
             <button
               type="button"
               onClick={() =>
-                setMenuOpen((value) => !value)
+                setMenuOpen(
+                  (value) => !value,
+                )
               }
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#202d3d] text-slate-300 transition-colors hover:bg-[#28384b] hover:text-white lg:hidden"
               aria-label="Ouvrir le menu"
-              aria-expanded={menuOpen}
+              aria-expanded={
+                menuOpen
+              }
             >
               <span className="flex flex-col gap-1.5">
                 <span className="h-px w-5 bg-current" />
@@ -390,11 +432,13 @@ export default function Navbar() {
         </div>
 
         {/* MENU MOBILE */}
+
         {menuOpen && (
           <div className="border-t border-white/[0.07] pb-4 pt-3 lg:hidden">
             <nav className="grid gap-1">
               {navItems.map((item) => {
-                const active = isActive(item.href);
+                const active =
+                  isActive(item.href);
 
                 return (
                   <Link
@@ -412,12 +456,15 @@ export default function Navbar() {
                       size={18}
                     />
 
-                    <span>{item.label}</span>
+                    <span>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}
 
               {/* NOTIFICATIONS MOBILE */}
+
               {connected && (
                 <Link
                   href="/notifications"
@@ -433,17 +480,22 @@ export default function Navbar() {
                     size={18}
                   />
 
-                  <span>Notifications</span>
+                  <span>
+                    Notifications
+                  </span>
                 </Link>
               )}
 
               {/* ADMIN MOBILE */}
+
               {isAdmin && (
                 <Link
                   href="/admin"
                   onClick={closeMenu}
                   className={`mt-2 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-black ${
-                    pathname.startsWith("/admin")
+                    pathname.startsWith(
+                      "/admin",
+                    )
                       ? "border-[#a9c9ff]/30 bg-[#a9c9ff]/10 text-[#c5dcff]"
                       : "border-white/10 bg-white/[0.04] text-slate-300"
                   }`}
@@ -453,7 +505,9 @@ export default function Navbar() {
                     size={18}
                   />
 
-                  <span>Mode admin</span>
+                  <span>
+                    Mode admin
+                  </span>
                 </Link>
               )}
             </nav>

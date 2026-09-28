@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/app/components/Navbar";
+import UserPresence from "@/app/components/UserPresence";
 
 export const metadata: Metadata = {
   title: "Part-66 B1.1",
@@ -16,6 +17,8 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
+        <UserPresence />
+
         <Navbar />
 
         <div className="site-theme">

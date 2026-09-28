@@ -14,6 +14,7 @@ const protectedRoutes = [
   "/progression",
   "/difficultes",
   "/recherche",
+  "/proposer",
   "/proposer-question",
   "/compte",
   "/notifications",
@@ -21,7 +22,9 @@ const protectedRoutes = [
   "/admin",
 ];
 
-function isProtectedRoute(pathname: string) {
+function isProtectedRoute(
+  pathname: string,
+) {
   return protectedRoutes.some(
     (route) =>
       pathname === route ||
@@ -29,14 +32,18 @@ function isProtectedRoute(pathname: string) {
   );
 }
 
-function isAdminRoute(pathname: string) {
+function isAdminRoute(
+  pathname: string,
+) {
   return (
     pathname === "/admin" ||
     pathname.startsWith("/admin/")
   );
 }
 
-function isProtectedApi(pathname: string) {
+function isProtectedApi(
+  pathname: string,
+) {
   return (
     pathname === "/api/qcm" ||
     pathname.startsWith("/api/qcm/")
@@ -124,7 +131,8 @@ export async function updateSession(
 
   const {
     data: claimsData,
-  } = await supabase.auth.getClaims();
+  } =
+    await supabase.auth.getClaims();
 
   const userId =
     typeof claimsData?.claims?.sub ===
