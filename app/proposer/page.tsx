@@ -1,555 +1,112 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_ID =
-  "dcbeb72a-4f4a-4169-beab-53da1b3babfa";
-
-const ONLINE_WINDOW_MS =
-  5 * 60 * 1000;
-
-type Module = {
-  id: number;
-  name: string;
-  description: string | null;
-};
-
-type Question = {
-  id: number;
-  module_id: number;
-  question: string;
-  status: string;
-  created_at: string;
-};
-
-type Course = {
-  id: number;
-  module_id: number | null;
+function ChoiceCard({
+  href,
+  icon,
+  eyebrow,
+  title,
+  description,
+  tags,
+}: {
+  href: string;
+  icon: string;
+  eyebrow: string;
   title: string;
-  created_at: string;
-};
+  description: string;
+  tags: string[];
+}) {
+  return (
+    <Link
+      href={href}
+      className="group relative overflow-hidden rounded-[34px] border border-white/10 bg-[#202d3d] p-7 transition hover:-translate-y-1 hover:border-[#a9c9ff]/25 hover:bg-[#28384b] sm:p-9"
+    >
+      <div className="absolute right-[-50px] top-[-50px] h-40 w-40 rounded-full bg-[#a9c9ff]/[0.035] blur-3xl" />
 
-type Sheet = {
-  id: number;
-  module_id: number | null;
-  title: string;
-  created_at: string;
-};
+      <div className="relative">
+        <div className="flex items-start justify-between gap-5">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-3xl">
+            {icon}
+          </div>
 
-type Attempt = {
-  id: number;
-  module_id: number;
-  percentage: number;
-  created_at: string;
-};
+          <span className="text-2xl text-slate-600 transition group-hover:translate-x-1 group-hover:text-white">
+            →
+          </span>
+        </div>
 
-type Profile = {
-  id: string;
-  email: string | null;
-  display_name: string | null;
-  created_at: string;
-};
+        <div className="mt-8 text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+          {eyebrow}
+        </div>
 
-type Presence = {
-  user_id: string;
-  last_seen_at: string;
-};
+        <h2 className="mt-2 text-3xl font-black text-white">
+          {title}
+        </h2>
 
-function moduleNumber(name: string) {
-  return name.match(/^Module\s+(\d+)/)?.[1] || "";
-}
+        <p className="mt-4 max-w-md text-sm leading-7 text-slate-400">
+          {description}
+        </p>
 
-function moduleTitle(name: string) {
-  return name.replace(
-    /^Module\s+\d+\s+—\s*/,
-    "",
+        <div className="mt-7 flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-8 text-sm font-black text-[#c5dcff]">
+          Ouvrir →
+        </div>
+      </div>
+    </Link>
   );
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(
-    "fr-FR",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    },
-  );
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString(
-    "fr-FR",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  );
-}
-
-function getProfileName(
-  profile: Profile,
-) {
-  if (
-    profile.display_name &&
-    profile.display_name.trim()
-  ) {
-    return profile.display_name.trim();
-  }
-
-  if (
-    profile.email &&
-    profile.email.includes("@")
-  ) {
-    return profile.email
-      .split("@")[0]
-      .replace(/[._-]+/g, " ");
-  }
-
-  return "Utilisateur";
-}
-
-export default function AdminPage() {
-  const [modules, setModules] = useState<
-    Module[]
-  >([]);
-
-  const [questions, setQuestions] = useState<
-    Question[]
-  >([]);
-
-  const [courses, setCourses] = useState<
-    Course[]
-  >([]);
-
-  const [sheets, setSheets] = useState<
-    Sheet[]
-  >([]);
-
-  const [attempts, setAttempts] = useState<
-    Attempt[]
-  >([]);
-
-  const [profiles, setProfiles] = useState<
-    Profile[]
-  >([]);
-
-  const [totalUsers, setTotalUsers] =
-    useState(0);
-
-  const [onlineUsers, setOnlineUsers] =
-    useState(0);
-
-  const [onlineUserIds, setOnlineUserIds] =
-    useState<string[]>([]);
-
-  const [usersLoading, setUsersLoading] =
-    useState(true);
-
+export default function ProposerPage() {
   const [loading, setLoading] =
     useState(true);
-
-  const [authorized, setAuthorized] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [usersError, setUsersError] =
-    useState("");
 
   useEffect(() => {
     let mounted = true;
 
-    async function load() {
-      setLoading(true);
-      setError("");
-
+    async function checkSession() {
       const {
-        data: { user },
+        data: { session },
       } =
-        await supabase.auth.getUser();
+        await supabase.auth.getSession();
 
       if (!mounted) {
         return;
       }
 
-      if (!user) {
+      if (!session?.user) {
         window.location.href =
-          "/connexion";
+          "/connexion?redirect=/proposer";
         return;
       }
-
-      if (user.id !== ADMIN_ID) {
-        window.location.href = "/";
-        return;
-      }
-
-      setAuthorized(true);
-
-      const [
-        modulesResult,
-        questionsResult,
-        coursesResult,
-        sheetsResult,
-        attemptsResult,
-      ] = await Promise.all([
-        supabase
-          .from("modules")
-          .select(
-            "id, name, description",
-          )
-          .order("id", {
-            ascending: true,
-          }),
-
-        supabase
-          .from("questions")
-          .select(
-            "id, module_id, question, status, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(2000),
-
-        supabase
-          .from("course_files")
-          .select(
-            "id, module_id, title, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          }),
-
-        supabase
-          .from("revision_sheets")
-          .select(
-            "id, module_id, title, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          }),
-
-        supabase
-          .from("qcm_attempts")
-          .select(
-            "id, module_id, percentage, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1000),
-      ]);
-
-      if (modulesResult.error) {
-        setError(
-          modulesResult.error.message,
-        );
-      } else if (questionsResult.error) {
-        setError(
-          questionsResult.error.message,
-        );
-      } else if (coursesResult.error) {
-        setError(
-          coursesResult.error.message,
-        );
-      } else if (sheetsResult.error) {
-        setError(
-          sheetsResult.error.message,
-        );
-      } else if (attemptsResult.error) {
-        setError(
-          attemptsResult.error.message,
-        );
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setModules(
-        modulesResult.data || [],
-      );
-
-      setQuestions(
-        questionsResult.data || [],
-      );
-
-      setCourses(
-        coursesResult.data || [],
-      );
-
-      setSheets(
-        sheetsResult.data || [],
-      );
-
-      setAttempts(
-        attemptsResult.data || [],
-      );
 
       setLoading(false);
     }
 
-    load();
+    checkSession();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadUsers() {
-      setUsersLoading(true);
-      setUsersError("");
-
-      const onlineSince = new Date(
-        Date.now() -
-          ONLINE_WINDOW_MS,
-      ).toISOString();
-
-      const [
-        profilesResult,
-        countResult,
-        presenceResult,
-      ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select(
-            "id, email, display_name, created_at",
-          )
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(8),
-
-        supabase
-          .from("profiles")
-          .select("id", {
-            count: "exact",
-            head: true,
-          }),
-
-        supabase
-          .from("user_presence")
-          .select(
-            "user_id, last_seen_at",
-          )
-          .gte(
-            "last_seen_at",
-            onlineSince,
-          ),
-      ]);
-
-      if (!mounted) {
-        return;
-      }
-
-      if (profilesResult.error) {
-        setUsersError(
-          profilesResult.error.message,
-        );
-      } else if (countResult.error) {
-        setUsersError(
-          countResult.error.message,
-        );
-      } else if (presenceResult.error) {
-        setUsersError(
-          presenceResult.error.message,
-        );
-      }
-
-      const presenceRows =
-        (presenceResult.data ||
-          []) as Presence[];
-
-      const uniqueOnlineIds =
-        Array.from(
-          new Set(
-            presenceRows.map(
-              (item) => item.user_id,
-            ),
-          ),
-        );
-
-      setProfiles(
-        (profilesResult.data ||
-          []) as Profile[],
-      );
-
-      setTotalUsers(
-        countResult.count || 0,
-      );
-
-      setOnlineUserIds(
-        uniqueOnlineIds,
-      );
-
-      setOnlineUsers(
-        uniqueOnlineIds.length,
-      );
-
-      setUsersLoading(false);
-    }
-
-    loadUsers();
-
-    const interval =
-      setInterval(
-        loadUsers,
-        30_000,
-      );
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const approvedQuestions =
-    questions.filter(
-      (question) =>
-        question.status ===
-        "approved",
-    ).length;
-
-  const draftQuestions =
-    questions.filter(
-      (question) =>
-        question.status === "draft",
-    ).length;
-
-  const rejectedQuestions =
-    questions.filter(
-      (question) =>
-        question.status ===
-        "rejected",
-    ).length;
-
-  const average = useMemo(() => {
-    if (attempts.length === 0) {
-      return 0;
-    }
-
-    return Math.round(
-      attempts.reduce(
-        (sum, attempt) =>
-          sum + attempt.percentage,
-        0,
-      ) / attempts.length,
-    );
-  }, [attempts]);
-
-  const bestScore = useMemo(() => {
-    if (attempts.length === 0) {
-      return 0;
-    }
-
-    return Math.max(
-      ...attempts.map(
-        (attempt) =>
-          attempt.percentage,
-      ),
-    );
-  }, [attempts]);
-
-  const moduleStats = useMemo(() => {
-    return modules.map((module) => {
-      const moduleQuestions =
-        questions.filter(
-          (question) =>
-            question.module_id ===
-            module.id,
-        );
-
-      const moduleCourses =
-        courses.filter(
-          (course) =>
-            course.module_id ===
-            module.id,
-        );
-
-      const moduleSheets =
-        sheets.filter(
-          (sheet) =>
-            sheet.module_id ===
-            module.id,
-        );
-
-      const moduleAttempts =
-        attempts.filter(
-          (attempt) =>
-            attempt.module_id ===
-            module.id,
-        );
-
-      const moduleAverage =
-        moduleAttempts.length > 0
-          ? Math.round(
-              moduleAttempts.reduce(
-                (sum, attempt) =>
-                  sum +
-                  attempt.percentage,
-                0,
-              ) /
-                moduleAttempts.length,
-            )
-          : 0;
-
-      const moduleDrafts =
-        moduleQuestions.filter(
-          (question) =>
-            question.status ===
-            "draft",
-        ).length;
-
-      return {
-        module,
-        questions:
-          moduleQuestions.length,
-        drafts: moduleDrafts,
-        courses:
-          moduleCourses.length,
-        sheets:
-          moduleSheets.length,
-        attempts:
-          moduleAttempts.length,
-        average:
-          moduleAverage,
-      };
-    });
-  }, [
-    modules,
-    questions,
-    courses,
-    sheets,
-    attempts,
-  ]);
-
-  const recentQuestions =
-    questions.slice(0, 7);
-
-  const recentCourses =
-    courses.slice(0, 6);
-
-  const modulesWithDrafts =
-    moduleStats.filter(
-      (item) => item.drafts > 0,
-    ).length;
-
-  if (loading || !authorized) {
+  if (loading) {
     return (
       <main className="min-h-screen bg-[#182332] text-white">
         <div className="flex min-h-screen items-center justify-center px-4">
-          <div className="rounded-3xl border border-white/10 bg-[#202d3d] px-6 py-5 text-sm font-semibold text-slate-300">
-            Chargement du centre administration...
+          <div className="rounded-2xl border border-white/10 bg-[#202d3d] px-6 py-4 text-sm font-semibold text-slate-300">
+            Préparation...
           </div>
         </div>
       </main>
@@ -558,1055 +115,88 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#182332] text-white">
-      {/* =====================================================
-          BACKGROUND
-      ===================================================== */}
-
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute left-1/2 top-[-120px] h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
 
-        <div className="absolute left-[-140px] top-[45%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
+        <div className="absolute left-[-10%] top-[45%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
-        <div className="absolute right-[-140px] top-[20%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
+        <div className="absolute right-[-10%] top-[25%] h-[500px] w-[500px] rounded-full bg-white/[0.015] blur-[120px]" />
 
         <div
           className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-            backgroundSize:
-              "50px 50px",
+              "linear-gradient(rgba(255,255,255,0.55) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.55) 1px, transparent 1px)",
+            backgroundSize: "50px 50px",
           }}
         />
       </div>
 
-      <div className="relative mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
-        {/* =====================================================
-            HEADER
-        ===================================================== */}
-
+      <div className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.15)] sm:p-10">
-          <div className="absolute right-[-100px] top-[-100px] h-[320px] w-[320px] rounded-full bg-white/[0.03] blur-[90px]" />
+          <div className="absolute right-[-100px] top-[-100px] h-[300px] w-[300px] rounded-full bg-white/[0.035] blur-[90px]" />
 
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative">
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
+              <span className="h-2 w-2 rounded-full bg-[#a9c9ff]" />
+              Contribution étudiante
+            </div>
+
+            <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+              Que veux-tu créer ?
+            </h1>
+
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+              Partage ton travail avec les autres étudiants et
+              aide à enrichir la plateforme B1.1.
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-5 md:grid-cols-2">
+          <ChoiceCard
+            href="/proposer-question"
+            icon="📝"
+            eyebrow="Contribution 01"
+            title="Créer un QCM"
+            description="Propose une nouvelle question avec ses réponses, son explication et sa source."
+            tags={[
+              "Question",
+              "3 réponses",
+              "Correction",
+            ]}
+          />
+
+          <ChoiceCard
+            href="/proposer/fiche"
+            icon="📄"
+            eyebrow="Contribution 02"
+            title="Créer une fiche"
+            description="Ajoute une fiche de révision avec son module, son titre et ton PDF."
+            tags={[
+              "Résumé",
+              "PDF",
+              "Module",
+            ]}
+          />
+        </section>
+
+        <section className="mt-5 rounded-[30px] border border-white/10 bg-[#202d3d] p-6 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.05] text-xl">
+              💡
+            </div>
+
             <div>
-              <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Administration center
+              <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
+                Contribution
               </div>
 
-              <h1 className="mt-4 text-4xl font-black leading-none tracking-[-0.05em] text-white sm:text-5xl">
-                Centre de contrôle
-              </h1>
-
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Gère les contenus, surveille les questions et
-                visualise l&apos;activité de la plateforme Part-66 B1.1.
+              <p className="mt-1 text-sm leading-6 text-slate-400">
+                Tes contributions doivent rester liées à la
+                formation Part-66 B1.1 et apporter une réelle
+                valeur aux autres étudiants.
               </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/[0.10] px-5 py-4">
-              <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
-                Système
-              </div>
-
-              <div className="mt-1 flex items-center gap-2 text-sm font-black text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                ADMIN CONNECTÉ
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {error && (
-          <div className="mt-5 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3 text-sm font-semibold text-red-200">
-            {error}
-          </div>
-        )}
-
-        {/* =====================================================
-            UTILISATEURS
-        ===================================================== */}
-
-        <section className="mt-5 grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
-          {/* ===================================================
-              COMPTEURS
-          =================================================== */}
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Utilisateurs
-            </div>
-
-            <h2 className="mt-2 text-2xl font-black">
-              Activité étudiants
-            </h2>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
-                      Total inscrits
-                    </div>
-
-                    <div className="mt-2 text-4xl font-black text-white">
-                      {usersLoading
-                        ? "—"
-                        : totalUsers}
-                    </div>
-
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      comptes créés
-                    </div>
-                  </div>
-
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl">
-                    👥
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.22em] text-slate-500">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
-                      Actifs maintenant
-                    </div>
-
-                    <div className="mt-2 text-4xl font-black text-emerald-300">
-                      {usersLoading
-                        ? "—"
-                        : onlineUsers}
-                    </div>
-
-                    <div className="mt-1 text-[10px] text-slate-500">
-                      actifs sur les 5 dernières minutes
-                    </div>
-                  </div>
-
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-300/10 text-xl text-emerald-300">
-                    ●
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-              <div>
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Mise à jour
-                </div>
-
-                <div className="mt-1 text-xs font-bold text-slate-400">
-                  Automatique toutes les 30 secondes
-                </div>
-              </div>
-
-              <div className="h-2 w-2 rounded-full bg-emerald-400" />
-            </div>
-
-            {usersError && (
-              <div className="mt-4 rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3 text-xs leading-5 text-red-200">
-                {usersError}
-              </div>
-            )}
-          </div>
-
-          {/* ===================================================
-              DERNIERS INSCRITS
-          =================================================== */}
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                  Nouveaux comptes
-                </div>
-
-                <h2 className="mt-2 text-2xl font-black">
-                  Derniers inscrits
-                </h2>
-              </div>
-
-              <div className="text-right">
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Total
-                </div>
-
-                <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                  {usersLoading
-                    ? "—"
-                    : totalUsers}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {usersLoading ? (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 text-sm text-slate-500">
-                  Chargement des utilisateurs…
-                </div>
-              ) : profiles.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
-                  <div className="text-2xl">
-                    👤
-                  </div>
-
-                  <div className="mt-3 text-sm font-black text-white">
-                    Aucun inscrit trouvé
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-500">
-                    Les nouveaux comptes apparaîtront ici.
-                  </div>
-                </div>
-              ) : (
-                profiles.map(
-                  (profile) => {
-                    const isOnline =
-                      onlineUserIds.includes(
-                        profile.id,
-                      );
-
-                    return (
-                      <div
-                        key={profile.id}
-                        className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3 sm:p-4"
-                      >
-                        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#a9c9ff]/10 text-sm font-black text-[#c5dcff]">
-                          {getProfileName(
-                            profile,
-                          )
-                            .slice(0, 1)
-                            .toUpperCase()}
-
-                          {isOnline && (
-                            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#202d3d] bg-emerald-400" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-black text-white">
-                            {getProfileName(
-                              profile,
-                            )}
-                          </div>
-
-                          <div className="mt-0.5 truncate text-[10px] text-slate-500">
-                            {profile.email ||
-                              "Email non disponible"}
-                          </div>
-                        </div>
-
-                        <div className="hidden shrink-0 text-right sm:block">
-                          <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                            Inscrit le
-                          </div>
-
-                          <div className="mt-1 text-[10px] font-bold text-slate-400">
-                            {formatDate(
-                              profile.created_at,
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="shrink-0">
-                          {isOnline ? (
-                            <span className="rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-300">
-                              En ligne
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                              Hors ligne
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  },
-                )
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            KPI
-        ===================================================== */}
-
-        <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Modules
-            </div>
-
-            <div className="mt-3 text-3xl font-black">
-              {modules.length}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Cours
-            </div>
-
-            <div className="mt-3 text-3xl font-black">
-              {courses.length}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Fiches
-            </div>
-
-            <div className="mt-3 text-3xl font-black">
-              {sheets.length}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Questions
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-[#a9c9ff]">
-              {questions.length}
-            </div>
-
-            <div className="mt-1 text-[10px] text-slate-500">
-              {approvedQuestions} validées
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              À valider
-            </div>
-
-            <div className="mt-3 text-3xl font-black text-amber-300">
-              {draftQuestions}
-            </div>
-
-            <div className="mt-1 text-[10px] text-slate-500">
-              {modulesWithDrafts} module
-              {modulesWithDrafts > 1
-                ? "s"
-                : ""}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-[#202d3d] p-5">
-            <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-              Activité QCM
-            </div>
-
-            <div className="mt-3 text-3xl font-black">
-              {attempts.length}
-            </div>
-
-            <div className="mt-1 text-[10px] text-slate-500">
-              moyenne{" "}
-              {attempts.length
-                ? `${average}%`
-                : "—"}
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            ACTIONS
-        ===================================================== */}
-
-        <section className="mt-10">
-          <div className="mb-5">
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Control center
-            </div>
-
-            <h2 className="mt-2 text-2xl font-black">
-              Outils d&apos;administration
-            </h2>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Link
-              href="/admin/questions"
-              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-xl font-black text-[#a9c9ff]">
-                  ?
-                </div>
-
-                {draftQuestions > 0 && (
-                  <span className="rounded-full bg-amber-400/10 px-3 py-1.5 text-[9px] font-black text-amber-300">
-                    {draftQuestions} à valider
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                Content
-              </div>
-
-              <h3 className="mt-1 text-xl font-black">
-                Questions
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Gérer, modifier et valider la banque de questions.
-              </p>
-
-              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Ouvrir →
-              </div>
-            </Link>
-
-            <Link
-              href="/admin/signalements"
-              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
-                !
-              </div>
-
-              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                Moderation
-              </div>
-
-              <h3 className="mt-1 text-xl font-black">
-                Signalements
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Consulte les problèmes signalés par les étudiants.
-              </p>
-
-              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Ouvrir →
-              </div>
-            </Link>
-
-            <Link
-              href="/publier/cours"
-              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
-                +
-              </div>
-
-              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                Formation
-              </div>
-
-              <h3 className="mt-1 text-xl font-black">
-                Ajouter un cours
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Publie un nouveau support PDF pour un module.
-              </p>
-
-              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Publier →
-              </div>
-            </Link>
-
-            <Link
-              href="/"
-              className="group rounded-[30px] border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-xl font-black text-slate-200">
-                ↗
-              </div>
-
-              <div className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                Platform
-              </div>
-
-              <h3 className="mt-1 text-xl font-black">
-                Voir le site
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Retourne à l&apos;interface étudiante.
-              </p>
-
-              <div className="mt-5 text-xs font-black text-slate-500 group-hover:text-white">
-                Ouvrir →
-              </div>
-            </Link>
-          </div>
-        </section>
-
-        {/* =====================================================
-            QUESTIONS / CONTENU
-        ===================================================== */}
-
-        <section className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                  Question database
-                </div>
-
-                <h2 className="mt-2 text-2xl font-black">
-                  Questions récentes
-                </h2>
-              </div>
-
-              <Link
-                href="/admin/questions"
-                className="text-xs font-black text-slate-500 hover:text-white"
-              >
-                Toutes →
-              </Link>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {recentQuestions.length ===
-              0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                  Aucune question.
-                </div>
-              ) : (
-                recentQuestions.map(
-                  (question) => {
-                    const module =
-                      modules.find(
-                        (item) =>
-                          item.id ===
-                          question.module_id,
-                      );
-
-                    return (
-                      <div
-                        key={question.id}
-                        className="flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black text-slate-300">
-                          {module
-                            ? moduleNumber(
-                                module.name,
-                              )
-                            : "?"}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-black">
-                            {question.question}
-                          </div>
-
-                          <div className="mt-1 text-[10px] text-slate-500">
-                            {module
-                              ? moduleTitle(
-                                  module.name,
-                                )
-                              : "Sans module"}
-                            {" · "}
-                            {formatDate(
-                              question.created_at,
-                            )}
-                          </div>
-                        </div>
-
-                        <span
-                          className={`shrink-0 rounded-full px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] ${
-                            question.status ===
-                            "approved"
-                              ? "bg-emerald-400/10 text-emerald-300"
-                              : question.status ===
-                                  "draft"
-                                ? "bg-amber-400/10 text-amber-300"
-                                : "bg-red-400/10 text-red-300"
-                          }`}
-                        >
-                          {question.status}
-                        </span>
-                      </div>
-                    );
-                  },
-                )
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Database health
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                État du contenu
-              </h2>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Questions validées
-                  </span>
-
-                  <span className="font-black text-emerald-300">
-                    {approvedQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-emerald-400"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (approvedQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Brouillons
-                  </span>
-
-                  <span className="font-black text-amber-300">
-                    {draftQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-amber-300"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (draftQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">
-                    Questions refusées
-                  </span>
-
-                  <span className="font-black text-red-300">
-                    {rejectedQuestions}
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-red-400"
-                    style={{
-                      width: `${
-                        questions.length
-                          ? (rejectedQuestions /
-                              questions.length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            MODULES
-        ===================================================== */}
-
-        <section className="mt-10">
-          <div className="mb-5">
-            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-              Module monitoring
-            </div>
-
-            <h2 className="mt-2 text-2xl font-black">
-              État des modules
-            </h2>
-          </div>
-
-          <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#202d3d]">
-            <div className="divide-y divide-white/[0.06]">
-              {moduleStats.map(
-                (item) => (
-                  <div
-                    key={item.module.id}
-                    className="p-5"
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                      <div className="flex items-center gap-4 xl:w-[340px]">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-xs font-black text-[#a9c9ff]">
-                          {moduleNumber(
-                            item.module.name,
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="truncate font-black text-white">
-                            {moduleTitle(
-                              item.module.name,
-                            )}
-                          </div>
-
-                          <div className="mt-1 text-[10px] text-slate-500">
-                            {item.questions} questions
-                            {" · "}
-                            {item.courses} cours
-                            {" · "}
-                            {item.sheets} fiches
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Questions
-                          </div>
-
-                          <div className="mt-1 text-sm font-black">
-                            {item.questions}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Brouillons
-                          </div>
-
-                          <div className="mt-1 text-sm font-black text-amber-300">
-                            {item.drafts}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            QCM
-                          </div>
-
-                          <div className="mt-1 text-sm font-black">
-                            {item.attempts}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white/[0.025] p-3">
-                          <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-600">
-                            Moyenne
-                          </div>
-
-                          <div className="mt-1 text-sm font-black text-[#a9c9ff]">
-                            {item.attempts
-                              ? `${item.average}%`
-                              : "—"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Link
-                          href={`/cours/${item.module.id}`}
-                          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                        >
-                          Voir
-                        </Link>
-
-                        <Link
-                          href={`/admin/questions/${item.module.id}`}
-                          className="rounded-xl bg-[#6ea8ff] px-4 py-3 text-xs font-black text-[#122033] transition hover:bg-[#83b5ff]"
-                        >
-                          Gérer
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            ACTIVITE
-        ===================================================== */}
-
-        <section className="mt-10 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                QCM activity
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                Activité récente
-              </h2>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {attempts
-                .slice(0, 6)
-                .map((attempt) => {
-                  const module =
-                    modules.find(
-                      (item) =>
-                        item.id ===
-                        attempt.module_id,
-                    );
-
-                  return (
-                    <div
-                      key={attempt.id}
-                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
-                        {module
-                          ? moduleNumber(
-                              module.name,
-                            )
-                          : "?"}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black">
-                          {module
-                            ? moduleTitle(
-                                module.name,
-                              )
-                            : "Module"}
-                        </div>
-
-                        <div className="mt-1 text-[10px] text-slate-500">
-                          {formatDateTime(
-                            attempt.created_at,
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`text-lg font-black ${
-                          attempt.percentage >=
-                          80
-                            ? "text-emerald-300"
-                            : attempt.percentage >=
-                                60
-                              ? "text-[#a9c9ff]"
-                              : "text-red-300"
-                        }`}
-                      >
-                        {attempt.percentage}%
-                      </div>
-                    </div>
-                  );
-                })}
-
-              {attempts.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                  Aucun QCM enregistré.
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                  Moyenne globale
-                </div>
-
-                <div className="mt-1 text-xl font-black text-[#a9c9ff]">
-                  {attempts.length
-                    ? `${average}%`
-                    : "—"}
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.025] p-4">
-                <div className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-600">
-                  Meilleur score
-                </div>
-
-                <div className="mt-1 text-xl font-black">
-                  {attempts.length
-                    ? `${bestScore}%`
-                    : "—"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Latest content
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                Derniers cours ajoutés
-              </h2>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {recentCourses.map(
-                (course) => {
-                  const module =
-                    modules.find(
-                      (item) =>
-                        item.id ===
-                        course.module_id,
-                    );
-
-                  return (
-                    <div
-                      key={course.id}
-                      className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xs font-black">
-                        {module
-                          ? moduleNumber(
-                              module.name,
-                            )
-                          : "—"}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black">
-                          {course.title}
-                        </div>
-
-                        <div className="mt-1 text-[10px] text-slate-500">
-                          {module
-                            ? moduleTitle(
-                                module.name,
-                              )
-                            : "Sans module"}
-                          {" · "}
-                          {formatDate(
-                            course.created_at,
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                },
-              )}
-
-              {recentCourses.length ===
-                0 && (
-                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                  Aucun cours disponible.
-                </div>
-              )}
-            </div>
-
-            <Link
-              href="/cours"
-              className="mt-6 flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-black text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-            >
-              Voir les cours →
-            </Link>
-          </div>
-        </section>
-
-        {/* =====================================================
-            RESUME UTILISATEURS
-        ===================================================== */}
-
-        <section className="mt-10 rounded-[30px] border border-white/10 bg-[#202d3d] p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Live monitoring
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black">
-                Présence sur la plateforme
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]" />
-              {onlineUsers} utilisateur
-              {onlineUsers > 1
-                ? "s"
-                : ""}{" "}
-              actif
-              {onlineUsers > 1
-                ? "s"
-                : ""}
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                Inscrits
-              </div>
-
-              <div className="mt-2 text-3xl font-black">
-                {totalUsers}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.035] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                En ligne
-              </div>
-
-              <div className="mt-2 text-3xl font-black text-emerald-300">
-                {onlineUsers}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5">
-              <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                Inactifs
-              </div>
-
-              <div className="mt-2 text-3xl font-black">
-                {Math.max(
-                  0,
-                  totalUsers -
-                    onlineUsers,
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                  Définition
-                </div>
-
-                <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Un utilisateur est considéré comme actif s&apos;il a
-                  utilisé la plateforme durant les 5 dernières minutes.
-                </div>
-              </div>
-
-              <div className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-600">
-                Refresh 30s
-              </div>
             </div>
           </div>
         </section>

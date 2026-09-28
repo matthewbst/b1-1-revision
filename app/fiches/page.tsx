@@ -65,13 +65,17 @@ export default function FichesPage() {
   const [search, setSearch] =
     useState("");
 
-  const [selectedModule, setSelectedModule] =
-    useState("all");
+  const [
+    selectedModule,
+    setSelectedModule,
+  ] = useState("all");
 
   const [loading, setLoading] =
     useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     async function load() {
       const [
         modulesResult,
@@ -96,6 +100,10 @@ export default function FichesPage() {
           }),
       ]);
 
+      if (!mounted) {
+        return;
+      }
+
       setModules(
         modulesResult.data || [],
       );
@@ -108,13 +116,18 @@ export default function FichesPage() {
     }
 
     load();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const filteredSheets = useMemo(
-    () => {
-      const term = normalize(
-        search.trim(),
-      );
+  const filteredSheets =
+    useMemo(() => {
+      const term =
+        normalize(
+          search.trim(),
+        );
 
       return sheets.filter(
         (sheet) => {
@@ -130,15 +143,19 @@ export default function FichesPage() {
               "all" ||
             String(
               sheet.module_id,
-            ) === selectedModule;
+            ) ===
+              selectedModule;
 
-          const text = normalize(
-            `${sheet.title} ${
-              sheet.content || ""
-            } ${
-              module?.name || ""
-            }`,
-          );
+          const text =
+            normalize(
+              `${sheet.title} ${
+                sheet.content ||
+                ""
+              } ${
+                module?.name ||
+                ""
+              }`,
+            );
 
           const searchMatch =
             !term ||
@@ -150,18 +167,16 @@ export default function FichesPage() {
           );
         },
       );
-    },
-    [
+    }, [
       modules,
       sheets,
       search,
       selectedModule,
-    ],
-  );
+    ]);
 
-  const publicUrl = (
+  function getPublicUrl(
     path: string | null,
-  ) => {
+  ) {
     if (!path) {
       return null;
     }
@@ -170,7 +185,7 @@ export default function FichesPage() {
       .from("revision-pdfs")
       .getPublicUrl(path).data
       .publicUrl;
-  };
+  }
 
   if (loading) {
     return (
@@ -186,8 +201,6 @@ export default function FichesPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#182332] text-white">
-      {/* BACKGROUND */}
-
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute left-1/2 top-0 h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
 
@@ -207,8 +220,6 @@ export default function FichesPage() {
       </div>
 
       <div className="relative mx-auto max-w-[1500px] px-4 py-7 sm:px-6 lg:px-8">
-        {/* HEADER */}
-
         <section className="rounded-[32px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_25px_70px_rgba(0,0,0,0.15)] sm:p-9">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -222,9 +233,9 @@ export default function FichesPage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                Retrouve rapidement tes supports de
-                révision et travaille les notions importantes
-                de ta formation B1.1.
+                Retrouve rapidement tes supports de révision et
+                travaille les notions importantes de ta formation
+                B1.1.
               </p>
             </div>
 
@@ -266,8 +277,6 @@ export default function FichesPage() {
             </div>
           </div>
         </section>
-
-        {/* FILTRES */}
 
         <section className="mt-5 rounded-3xl border border-white/10 bg-[#202d3d] p-4 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-[1fr_280px_auto]">
@@ -319,12 +328,8 @@ export default function FichesPage() {
               {modules.map(
                 (module) => (
                   <option
-                    key={
-                      module.id
-                    }
-                    value={
-                      module.id
-                    }
+                    key={module.id}
+                    value={module.id}
                   >
                     Module{" "}
                     {moduleNumber(
@@ -357,8 +362,6 @@ export default function FichesPage() {
             )}
           </div>
         </section>
-
-        {/* RESULTATS */}
 
         <section className="mt-10">
           <div className="mb-5 flex items-end justify-between">
@@ -394,7 +397,7 @@ export default function FichesPage() {
               </h3>
 
               <p className="mt-2 text-sm text-slate-500">
-                Modifie ta recherche ou ton filtre de module.
+                Modifie ta recherche ou ajoute ta première fiche.
               </p>
 
               <Link
@@ -415,16 +418,14 @@ export default function FichesPage() {
                         sheet.module_id,
                     );
 
-                  const url =
-                    publicUrl(
+                  const pdfUrl =
+                    getPublicUrl(
                       sheet.file_path,
                     );
 
                   return (
                     <article
-                      key={
-                        sheet.id
-                      }
+                      key={sheet.id}
                       className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#202d3d] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#28384b]"
                     >
                       <div className="absolute right-[-45px] top-[-45px] h-32 w-32 rounded-full bg-white/[0.025] blur-3xl" />
@@ -459,24 +460,22 @@ export default function FichesPage() {
 
                         {sheet.content && (
                           <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-400">
-                            {
-                              sheet.content
-                            }
+                            {sheet.content}
                           </p>
                         )}
 
                         <div className="mt-6 border-t border-white/[0.06] pt-4">
-                          {url ? (
+                          {pdfUrl ? (
                             <a
                               href={
-                                url
+                                pdfUrl
                               }
                               target="_blank"
                               rel="noreferrer"
                               className="flex items-center justify-between rounded-2xl bg-[#6ea8ff] px-4 py-3 text-sm font-black text-[#122033] transition hover:bg-[#83b5ff]"
                             >
                               <span>
-                                Ouvrir la fiche
+                                Ouvrir le PDF
                               </span>
 
                               <span>
@@ -484,8 +483,8 @@ export default function FichesPage() {
                               </span>
                             </a>
                           ) : (
-                            <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-slate-400">
-                              Contenu disponible
+                            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-sm font-bold text-slate-400">
+                              PDF non disponible
                             </div>
                           )}
                         </div>
@@ -498,8 +497,6 @@ export default function FichesPage() {
           )}
         </section>
 
-        {/* CTA */}
-
         <section className="mt-10 rounded-[30px] border border-white/10 bg-[#202d3d] p-7 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -508,12 +505,11 @@ export default function FichesPage() {
               </div>
 
               <h2 className="mt-2 text-2xl font-black text-white">
-                Tu as une fiche utile à partager ?
+                Tu as une fiche à partager ?
               </h2>
 
               <p className="mt-2 text-sm text-slate-400">
-                Ajoute ton résumé ou ton PDF pour aider
-                les autres étudiants B1.1.
+                Ajoute directement ton PDF depuis ton espace étudiant.
               </p>
             </div>
 
@@ -522,34 +518,6 @@ export default function FichesPage() {
               className="rounded-2xl bg-[#6ea8ff] px-6 py-4 text-center text-sm font-black text-[#122033] transition hover:bg-[#83b5ff]"
             >
               Ajouter ma fiche →
-            </Link>
-          </div>
-        </section>
-
-        {/* CTA QCM */}
-
-        <section className="mt-5 rounded-[30px] border border-white/10 bg-[#202d3d] p-7 sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
-                Next step
-              </div>
-
-              <h2 className="mt-2 text-2xl font-black text-white">
-                Tu veux tester ce que tu viens de réviser ?
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-400">
-                Lance directement un QCM depuis ton espace
-                d&apos;entraînement.
-              </p>
-            </div>
-
-            <Link
-              href="/qcm"
-              className="rounded-2xl bg-[#6ea8ff] px-6 py-4 text-center text-sm font-black text-[#122033] transition hover:bg-[#83b5ff]"
-            >
-              Lancer un QCM →
             </Link>
           </div>
         </section>

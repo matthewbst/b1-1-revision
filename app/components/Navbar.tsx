@@ -200,7 +200,9 @@ export default function Navbar() {
       const user = session?.user;
 
       setConnected(Boolean(user));
-      setIsAdmin(user?.id === ADMIN_ID);
+      setIsAdmin(
+        user?.id === ADMIN_ID,
+      );
     }
 
     checkUser();
@@ -231,7 +233,9 @@ export default function Navbar() {
     };
   }, []);
 
-  function isActive(href: string) {
+  function isActive(
+    href: string,
+  ) {
     if (href === "/") {
       return pathname === "/";
     }
@@ -272,8 +276,6 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#182332]/95 backdrop-blur-xl">
       <div className="mx-auto max-w-[1500px] px-3 sm:px-6 lg:px-8">
         <div className="flex min-h-[68px] items-center gap-3">
-          {/* LOGO */}
-
           <Link
             href="/"
             onClick={closeMenu}
@@ -301,43 +303,41 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* NAVIGATION DESKTOP */}
-
           <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
-            {navItems.map((item) => {
-              const active =
-                isActive(item.href);
+            {navItems.map(
+              (item) => {
+                const active =
+                  isActive(
+                    item.href,
+                  );
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition-colors ${
-                    active
-                      ? "bg-white/[0.08] text-white"
-                      : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-200"
-                  }`}
-                >
-                  <NavIcon
-                    name={item.icon}
-                    size={16}
-                  />
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition-colors ${
+                      active
+                        ? "bg-white/[0.08] text-white"
+                        : "text-slate-500 hover:bg-white/[0.04] hover:text-slate-200"
+                    }`}
+                  >
+                    <NavIcon
+                      name={item.icon}
+                      size={16}
+                    />
 
-                  <span>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
+                    <span>
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              },
+            )}
           </nav>
 
           <div className="flex-1" />
 
-          {/* ACTIONS DROITE */}
-
           <div className="flex shrink-0 items-center gap-2">
-            {/* ADMIN */}
-
             {isAdmin && (
               <Link
                 href="/admin"
@@ -361,8 +361,6 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* NOTIFICATIONS */}
-
             {connected && (
               <Link
                 href="/notifications"
@@ -380,8 +378,6 @@ export default function Navbar() {
                 />
               </Link>
             )}
-
-            {/* COMPTE */}
 
             <Link
               href={
@@ -407,8 +403,6 @@ export default function Navbar() {
               />
             </Link>
 
-            {/* MENU MOBILE */}
-
             <button
               type="button"
               onClick={() =>
@@ -431,39 +425,41 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* MENU MOBILE */}
-
         {menuOpen && (
           <div className="border-t border-white/[0.07] pb-4 pt-3 lg:hidden">
             <nav className="grid gap-1">
-              {navItems.map((item) => {
-                const active =
-                  isActive(item.href);
+              {navItems.map(
+                (item) => {
+                  const active =
+                    isActive(
+                      item.href,
+                    );
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={closeMenu}
-                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-black ${
-                      active
-                        ? "bg-white/[0.08] text-white"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    <NavIcon
-                      name={item.icon}
-                      size={18}
-                    />
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMenu}
+                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-black ${
+                        active
+                          ? "bg-white/[0.08] text-white"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      <NavIcon
+                        name={
+                          item.icon
+                        }
+                        size={18}
+                      />
 
-                    <span>
-                      {item.label}
-                    </span>
-                  </Link>
-                );
-              })}
-
-              {/* NOTIFICATIONS MOBILE */}
+                      <span>
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                },
+              )}
 
               {connected && (
                 <Link
@@ -485,8 +481,6 @@ export default function Navbar() {
                   </span>
                 </Link>
               )}
-
-              {/* ADMIN MOBILE */}
 
               {isAdmin && (
                 <Link
