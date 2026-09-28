@@ -2,20 +2,89 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+function getSafeRedirect(value: string | null) {
+  if (!value) {
+    return "/";
+  }
+
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return "/";
+  }
+
+  return value;
+}
+
+function getRequestedPage(path: string) {
+  if (path === "/qcm" || path.startsWith("/qcm/")) {
+    return "aux QCM";
+  }
+
+  if (path === "/cours" || path.startsWith("/cours/")) {
+    return "aux cours";
+  }
+
+  if (path === "/fiches" || path.startsWith("/fiches/")) {
+    return "aux fiches de révision";
+  }
+
+  if (path === "/progression") {
+    return "à ta progression";
+  }
+
+  if (path === "/difficultes") {
+    return "à tes difficultés";
+  }
+
+  if (path === "/recherche") {
+    return "à la recherche";
+  }
+
+  if (path === "/proposer-question") {
+    return "à la proposition de question";
+  }
+
+  if (path === "/compte") {
+    return "à ton compte";
+  }
+
+  if (path === "/publier" || path.startsWith("/publier/")) {
+    return "à la publication";
+  }
+
+  return "à cette page";
+}
+
 export default function ConnexionPage() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const searchParams = useSearchParams();
+
+  const redirectTo = getSafeRedirect(
+    searchParams.get("redirect"),
+  );
+
+  const cameFromProtectedPage =
+    Boolean(searchParams.get("redirect"));
+
+  const requestedPage = getRequestedPage(redirectTo);
+
+  const [mode, setMode] = useState<"login" | "signup">(
+    "login",
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setError("");
@@ -24,7 +93,9 @@ export default function ConnexionPage() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
-      setError("Remplis ton email et ton mot de passe.");
+      setError(
+        "Remplis ton email et ton mot de passe.",
+      );
       return;
     }
 
@@ -35,8 +106,13 @@ export default function ConnexionPage() {
       return;
     }
 
-    if (mode === "signup" && password !== confirmPassword) {
-      setError("Les deux mots de passe ne correspondent pas.");
+    if (
+      mode === "signup" &&
+      password !== confirmPassword
+    ) {
+      setError(
+        "Les deux mots de passe ne correspondent pas.",
+      );
       return;
     }
 
@@ -54,7 +130,7 @@ export default function ConnexionPage() {
           throw loginError;
         }
 
-        window.location.href = "/";
+        window.location.href = redirectTo;
         return;
       }
 
@@ -69,12 +145,12 @@ export default function ConnexionPage() {
       }
 
       if (data.session) {
-        window.location.href = "/";
+        window.location.href = redirectTo;
         return;
       }
 
       setMessage(
-        "Compte créé. Vérifie ton email pour confirmer ton inscription.",
+        "Ton compte a bien été créé. Vérifie ton email pour confirmer ton inscription.",
       );
 
       setMode("login");
@@ -93,11 +169,11 @@ export default function ConnexionPage() {
 
   return (
     <main className="relative min-h-[calc(100vh-68px)] overflow-hidden bg-[#182332] text-white">
-      {/* ======================================================
+      {/* =====================================================
           BACKGROUND
-      ====================================================== */}
+      ===================================================== */}
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-1/2 top-[5%] h-[650px] w-[650px] -translate-x-1/2 rounded-full bg-white/[0.025] blur-[130px]" />
 
         <div className="absolute left-[-150px] top-[40%] h-[450px] w-[450px] rounded-full bg-slate-200/[0.02] blur-[120px]" />
@@ -114,10 +190,10 @@ export default function ConnexionPage() {
         />
       </div>
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-68px)] max-w-[1250px] items-center px-4 py-10 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex min-h-[calc(100vh-68px)] max-w-[1250px] items-center px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid w-full gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           {/* ==================================================
-              INTRO
+              LEFT
           ================================================== */}
 
           <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.15)] sm:p-10">
@@ -139,8 +215,8 @@ export default function ConnexionPage() {
                 </h1>
 
                 <p className="mt-6 max-w-md text-sm leading-7 text-slate-300">
-                  Connecte-toi à ton espace de formation pour
-                  retrouver tes cours, tes QCM et toute ta progression.
+                  Connecte-toi à ton espace étudiant pour
+                  accéder à tous les contenus de la plateforme.
                 </p>
               </div>
 
@@ -153,11 +229,8 @@ export default function ConnexionPage() {
                   <div className="absolute inset-[70px] rounded-full border border-white/[0.06]" />
 
                   <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-white/25" />
-
                   <div className="absolute bottom-0 left-1/2 h-8 w-px -translate-x-1/2 bg-white/25" />
-
                   <div className="absolute left-0 top-1/2 h-px w-8 -translate-y-1/2 bg-white/25" />
-
                   <div className="absolute right-0 top-1/2 h-px w-8 -translate-y-1/2 bg-white/25" />
 
                   <svg
@@ -195,10 +268,71 @@ export default function ConnexionPage() {
           </section>
 
           {/* ==================================================
-              FORMULAIRE
+              RIGHT
           ================================================== */}
 
           <section className="rounded-[38px] border border-white/10 bg-[#202d3d] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.12)] sm:p-9">
+
+            {/* =================================================
+                GROS MESSAGE D'ACCÈS
+            ================================================= */}
+
+            {cameFromProtectedPage && (
+              <div className="mb-8 rounded-[28px] border border-[#a9c9ff]/25 bg-[#a9c9ff]/[0.08] p-5 sm:p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#a9c9ff]/10 text-[#a9c9ff]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-7 w-7"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <rect
+                        x="5"
+                        y="10"
+                        width="14"
+                        height="10"
+                        rx="2"
+                      />
+                      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                    </svg>
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-black uppercase tracking-[0.28em] text-[#a9c9ff]">
+                      Accès réservé
+                    </div>
+
+                    <h2 className="mt-2 text-xl font-black leading-6 text-white sm:text-2xl">
+                      Tu dois être connecté
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      Pour accéder {requestedPage}, tu dois
+                      d&apos;abord te connecter à ton compte étudiant.
+                    </p>
+
+                    <div className="mt-4 rounded-2xl border border-white/[0.07] bg-black/[0.12] px-4 py-3">
+                      <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-600">
+                        Destination demandée
+                      </div>
+
+                      <div className="mt-1 text-sm font-black text-white">
+                        {requestedPage.charAt(0).toUpperCase() +
+                          requestedPage.slice(1)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =================================================
+                TITRE
+            ================================================= */}
+
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
                 Student access
@@ -210,14 +344,16 @@ export default function ConnexionPage() {
                   : "Créer ton compte"}
               </h2>
 
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm leading-6 text-slate-500">
                 {mode === "login"
-                  ? "Retrouve ton espace étudiant."
-                  : "Rejoins la plateforme de révision B1.1."}
+                  ? "Entre tes identifiants pour accéder à la plateforme."
+                  : "Crée ton compte pour accéder aux cours et aux QCM."}
               </p>
             </div>
 
-            {/* SWITCH */}
+            {/* =================================================
+                SWITCH
+            ================================================= */}
 
             <div className="mt-7 grid grid-cols-2 rounded-2xl border border-white/10 bg-[#182332] p-1">
               <button
@@ -227,13 +363,13 @@ export default function ConnexionPage() {
                   setError("");
                   setMessage("");
                 }}
-                className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+                className={`rounded-xl px-4 py-3 text-sm font-black ${
                   mode === "login"
                     ? "bg-white/[0.10] text-white"
-                    : "text-slate-500 hover:text-slate-300"
+                    : "text-slate-500"
                 }`}
               >
-                Connexion
+                Se connecter
               </button>
 
               <button
@@ -243,15 +379,19 @@ export default function ConnexionPage() {
                   setError("");
                   setMessage("");
                 }}
-                className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+                className={`rounded-xl px-4 py-3 text-sm font-black ${
                   mode === "signup"
                     ? "bg-white/[0.10] text-white"
-                    : "text-slate-500 hover:text-slate-300"
+                    : "text-slate-500"
                 }`}
               >
-                Inscription
+                Créer un compte
               </button>
             </div>
+
+            {/* =================================================
+                FORMULAIRE
+            ================================================= */}
 
             <form
               onSubmit={handleSubmit}
@@ -305,7 +445,9 @@ export default function ConnexionPage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(event) =>
-                      setConfirmPassword(event.target.value)
+                      setConfirmPassword(
+                        event.target.value,
+                      )
                     }
                     placeholder="••••••••"
                     autoComplete="new-password"
@@ -334,15 +476,28 @@ export default function ConnexionPage() {
                 {loading
                   ? "Chargement..."
                   : mode === "login"
-                    ? "Se connecter →"
+                    ? "Se connecter et continuer →"
                     : "Créer mon compte →"}
               </button>
             </form>
 
-            <div className="mt-7 border-t border-white/[0.07] pt-6 text-center text-xs text-slate-600">
+            {/* =================================================
+                RAPPEL
+            ================================================= */}
+
+            {cameFromProtectedPage && (
+              <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-center">
+                <p className="text-xs leading-5 text-slate-500">
+                  Après connexion, tu seras automatiquement
+                  redirigé vers la page que tu voulais ouvrir.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-7 border-t border-white/[0.07] pt-6 text-center">
               <Link
                 href="/"
-                className="transition hover:text-slate-300"
+                className="text-xs font-semibold text-slate-600 transition hover:text-slate-300"
               >
                 ← Retour à l&apos;accueil
               </Link>
