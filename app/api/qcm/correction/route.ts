@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 type Submission = {
   questionId: number;
@@ -29,6 +29,17 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const moduleId = Number(body.moduleId);
+    const durationSeconds = Number(body.durationSeconds ?? 0);
+
+    const questionIdsFromBody = Array.isArray(body.questionIds)
+      ? body.questionIds
+          .map((id: unknown) => Number(id))
+          .filter(
+            (id: number) => Number.isInteger(id) && id > 0
+          )
+      : [];
 
     const questionIds = submissions.map(
       (submission) => Number(submission.questionId)
@@ -66,6 +77,46 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!Number.isInteger(moduleId) || moduleId <= 0) {
+      return NextResponse.json(
+        {
+          error: "Module invalide.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Client Supabase serveur :
+     * permet de récupérer l'utilisateur connecté
+     * à partir des cookies de session.
+     */
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error(
+        "Erreur récupération utilisateur :",
+        userError
+      );
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          error: "Utilisateur non connecté.",
+        },
+        { status: 401 }
+      );
+    }
+
+    /*
+     * Récupération des questions et des réponses.
+     */
     const { data: questions, error: questionsError } =
       await supabase
         .from("questions")
@@ -156,6 +207,61 @@ export async function POST(request: Request) {
         ? Math.round((score / total) * 100)
         : 0;
 
+    /*
+     * Toutes les questions du QCM.
+     */
+    const savedQuestionIds =
+      questionIdsFromBody.length > 0
+        ? questionIdsFromBody
+        : uniqueQuestionIds;
+
+    /*
+     * Questions auxquelles l'utilisateur a donné
+     * une mauvaise réponse.
+     */
+    const wrongQuestionIds = results
+      .filter((result) => !result.correct)
+      .map((result) => result.questionId);
+
+    /*
+     * Enregistrement de la tentative.
+     */
+    const { error: attemptError } = await supabase
+      .from("qcm_attempts")
+      .insert({
+        user_id: user.id,
+        module_id: moduleId,
+        score,
+        total,
+        percentage,
+        question_ids: savedQuestionIds,
+        wrong_question_ids: wrongQuestionIds,
+        duration_seconds:
+          Number.isFinite(durationSeconds) &&
+          durationSeconds >= 0
+            ? Math.round(durationSeconds)
+            : 0,
+      });
+
+    if (attemptError) {
+      console.error(
+        "Erreur enregistrement qcm_attempts :",
+        attemptError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Le QCM a été corrigé, mais son résultat n'a pas pu être enregistré.",
+          details: attemptError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    /*
+     * Retour du résultat au QCM.
+     */
     return NextResponse.json({
       score,
       total,
