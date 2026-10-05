@@ -169,9 +169,25 @@ export default function QcmPage() {
   const [savedQcm, setSavedQcm] =
     useState<SavedQcm | null>(null);
 
-  /* =========================================================
-     CHARGEMENT DES MODULES
-  ========================================================= */
+  // =========================================================
+  // SIGNALER UNE QUESTION
+  // =========================================================
+
+  const [reportOpen, setReportOpen] =
+    useState(false);
+
+  const [reportReason, setReportReason] =
+    useState("");
+
+  const [reporting, setReporting] =
+    useState(false);
+
+  const [reportMessage, setReportMessage] =
+    useState("");
+
+  // =========================================================
+  // CHARGEMENT DES MODULES
+  // =========================================================
 
   useEffect(() => {
     let mounted = true;
@@ -206,9 +222,7 @@ export default function QcmPage() {
       }
 
       if (modulesError) {
-        setError(
-          modulesError.message,
-        );
+        setError(modulesError.message);
       }
 
       setModules(data || []);
@@ -216,10 +230,6 @@ export default function QcmPage() {
     }
 
     loadModules();
-
-    /*
-      On regarde s'il existe un QCM sauvegardé.
-    */
 
     const saved = loadQcmFromStorage();
 
@@ -232,9 +242,9 @@ export default function QcmPage() {
     };
   }, []);
 
-  /* =========================================================
-     CHRONOMÈTRE
-  ========================================================= */
+  // =========================================================
+  // CHRONOMÈTRE
+  // =========================================================
 
   useEffect(() => {
     if (!started || finished) {
@@ -251,9 +261,9 @@ export default function QcmPage() {
       window.clearInterval(timer);
   }, [started, finished]);
 
-  /* =========================================================
-     SAUVEGARDE AUTOMATIQUE
-  ========================================================= */
+  // =========================================================
+  // SAUVEGARDE AUTOMATIQUE
+  // =========================================================
 
   useEffect(() => {
     if (
@@ -264,12 +274,6 @@ export default function QcmPage() {
     ) {
       return;
     }
-
-    /*
-      On sauvegarde automatiquement :
-      - immédiatement quand les questions/answers/index changent
-      - toutes les 5 secondes pendant le chrono
-    */
 
     if (
       seconds % 5 !== 0 &&
@@ -298,9 +302,9 @@ export default function QcmPage() {
     seconds,
   ]);
 
-  /* =========================================================
-     AVANT DE QUITTER LA PAGE
-  ========================================================= */
+  // =========================================================
+  // AVANT DE QUITTER LA PAGE
+  // =========================================================
 
   useEffect(() => {
     if (
@@ -346,9 +350,9 @@ export default function QcmPage() {
     seconds,
   ]);
 
-  /* =========================================================
-     DONNÉES COURANTES
-  ========================================================= */
+  // =========================================================
+  // DONNÉES COURANTES
+  // =========================================================
 
   const currentQuestion =
     questions[currentIndex];
@@ -356,44 +360,29 @@ export default function QcmPage() {
   const answeredCount =
     Object.keys(answers).length;
 
-  const progress =
-    questions.length > 0
-      ? Math.round(
-          (answeredCount /
-            questions.length) *
-            100,
-        )
-      : 0;
-
   const currentAnswer =
     currentQuestion
       ? answers[currentQuestion.id]
       : undefined;
 
-  const currentCorrection =
+  // =========================================================
+  // UNIQUEMENT LES ERREURS
+  // =========================================================
+
+  const wrongCorrections =
     useMemo(() => {
-      if (
-        !correction ||
-        !currentQuestion
-      ) {
-        return null;
+      if (!correction) {
+        return [];
       }
 
-      return (
-        correction.results.find(
-          (item) =>
-            item.questionId ===
-            currentQuestion.id,
-        ) || null
+      return correction.results.filter(
+        (item) => !item.isCorrect,
       );
-    }, [
-      correction,
-      currentQuestion,
-    ]);
+    }, [correction]);
 
-  /* =========================================================
-     DÉMARRER UN NOUVEAU QCM
-  ========================================================= */
+  // =========================================================
+  // DÉMARRER UN NOUVEAU QCM
+  // =========================================================
 
   async function startQcm() {
     if (!selectedModule) {
@@ -405,10 +394,6 @@ export default function QcmPage() {
 
     setError("");
     setLoadingQcm(true);
-
-    /*
-      Un nouveau QCM remplace l'ancien.
-    */
 
     clearSavedQcm();
     setSavedQcm(null);
@@ -438,11 +423,6 @@ export default function QcmPage() {
         );
       }
 
-      /*
-        Si moins de questions sont disponibles
-        que demandé, on prévient clairement.
-      */
-
       if (
         loadedQuestions.length <
         questionCount
@@ -469,6 +449,11 @@ export default function QcmPage() {
       setSeconds(0);
       setCorrection(null);
       setFinished(false);
+
+      setReportOpen(false);
+      setReportReason("");
+      setReportMessage("");
+
       setStarted(true);
     } catch (err) {
       setError(
@@ -481,9 +466,9 @@ export default function QcmPage() {
     }
   }
 
-  /* =========================================================
-     REPRENDRE LE QCM SAUVEGARDÉ
-  ========================================================= */
+  // =========================================================
+  // REPRENDRE LE QCM SAUVEGARDÉ
+  // =========================================================
 
   function resumeSavedQcm() {
     if (!savedQcm) {
@@ -537,29 +522,28 @@ export default function QcmPage() {
     setCorrection(null);
     setFinished(false);
     setError("");
-    setStarted(true);
 
-    /*
-      On retire uniquement le message de reprise.
-      Le QCM est maintenant actif et sera
-      de nouveau sauvegardé automatiquement.
-    */
+    setReportOpen(false);
+    setReportReason("");
+    setReportMessage("");
+
+    setStarted(true);
 
     setSavedQcm(null);
   }
 
-  /* =========================================================
-     SUPPRIMER LE QCM SAUVEGARDÉ
-  ========================================================= */
+  // =========================================================
+  // SUPPRIMER LE QCM SAUVEGARDÉ
+  // =========================================================
 
   function deleteSavedQcm() {
     clearSavedQcm();
     setSavedQcm(null);
   }
 
-  /* =========================================================
-     RÉPONSE
-  ========================================================= */
+  // =========================================================
+  // RÉPONSE
+  // =========================================================
 
   function chooseAnswer(
     answerId: number,
@@ -580,9 +564,9 @@ export default function QcmPage() {
     );
   }
 
-  /* =========================================================
-     NAVIGATION
-  ========================================================= */
+  // =========================================================
+  // NAVIGATION
+  // =========================================================
 
   function nextQuestion() {
     if (
@@ -592,6 +576,10 @@ export default function QcmPage() {
       setCurrentIndex(
         (value) => value + 1,
       );
+
+      setReportOpen(false);
+      setReportReason("");
+      setReportMessage("");
     }
   }
 
@@ -600,12 +588,109 @@ export default function QcmPage() {
       setCurrentIndex(
         (value) => value - 1,
       );
+
+      setReportOpen(false);
+      setReportReason("");
+      setReportMessage("");
     }
   }
 
-  /* =========================================================
-     CORRECTION
-  ========================================================= */
+  // =========================================================
+  // SIGNALER UNE QUESTION
+  // =========================================================
+
+  async function reportQuestion() {
+    if (
+      !currentQuestion ||
+      reporting
+    ) {
+      return;
+    }
+
+    const reason =
+      reportReason.trim();
+
+    if (!reason) {
+      setReportMessage(
+        "Explique pourquoi cette question semble incorrecte.",
+      );
+      return;
+    }
+
+    setReporting(true);
+    setReportMessage("");
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setReportMessage(
+          "Tu dois être connecté pour signaler une question.",
+        );
+        return;
+      }
+
+      const {
+        data: existingReport,
+        error: existingError,
+      } = await supabase
+        .from("question_reports")
+        .select("id")
+        .eq(
+          "question_id",
+          currentQuestion.id,
+        )
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (existingError) {
+        throw existingError;
+      }
+
+      if (existingReport) {
+        setReportMessage(
+          "Tu as déjà signalé cette question. L'administrateur va la vérifier.",
+        );
+        return;
+      }
+
+      const { error: reportError } =
+        await supabase
+          .from("question_reports")
+          .insert({
+            question_id:
+              currentQuestion.id,
+            user_id: user.id,
+            reason,
+            status: "pending",
+          });
+
+      if (reportError) {
+        throw reportError;
+      }
+
+      setReportMessage(
+        "✓ Signalement envoyé. Merci pour ton retour.",
+      );
+
+      setReportReason("");
+    } catch (err) {
+      setReportMessage(
+        err instanceof Error
+          ? err.message
+          : "Impossible d'envoyer le signalement.",
+      );
+    } finally {
+      setReporting(false);
+    }
+  }
+
+  // =========================================================
+  // CORRECTION
+  // =========================================================
 
   async function finishQcm() {
     if (!questions.length) {
@@ -667,12 +752,6 @@ export default function QcmPage() {
                 Number(
                   selectedModule,
                 ),
-
-              /*
-                Plusieurs noms sont envoyés pour
-                rester compatible avec ta correction
-                actuelle.
-              */
 
               answers:
                 submissions,
@@ -762,11 +841,6 @@ export default function QcmPage() {
           ),
       });
 
-      /*
-        Le QCM est terminé :
-        on efface la sauvegarde.
-      */
-
       clearSavedQcm();
       setSavedQcm(null);
 
@@ -782,9 +856,9 @@ export default function QcmPage() {
     }
   }
 
-  /* =========================================================
-     RESET
-  ========================================================= */
+  // =========================================================
+  // RESET
+  // =========================================================
 
   function reset() {
     clearSavedQcm();
@@ -798,11 +872,15 @@ export default function QcmPage() {
     setFinished(false);
     setCorrection(null);
     setError("");
+
+    setReportOpen(false);
+    setReportReason("");
+    setReportMessage("");
   }
 
-  /* =========================================================
-     LOADING
-  ========================================================= */
+  // =========================================================
+  // LOADING
+  // =========================================================
 
   if (loading) {
     return (
@@ -816,9 +894,9 @@ export default function QcmPage() {
     );
   }
 
-  /* =========================================================
-     CONFIGURATION
-  ========================================================= */
+  // =========================================================
+  // CONFIGURATION
+  // =========================================================
 
   if (!started) {
     return (
@@ -842,10 +920,6 @@ export default function QcmPage() {
         </div>
 
         <div className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
-          {/* =================================================
-              QCM SAUVEGARDÉ
-          ================================================= */}
-
           {savedQcm && (
             <section className="relative mb-5 overflow-hidden rounded-[30px] border border-[#a9c9ff]/25 bg-gradient-to-r from-[#233246] to-[#30475d] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] sm:p-6">
               <div className="absolute right-[-50px] top-[-50px] h-40 w-40 rounded-full bg-[#a9c9ff]/[0.04] blur-3xl" />
@@ -854,7 +928,6 @@ export default function QcmPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
                     <span className="h-2 w-2 rounded-full bg-[#a9c9ff]" />
-
                     QCM sauvegardé
                   </div>
 
@@ -931,14 +1004,8 @@ export default function QcmPage() {
             </section>
           )}
 
-          {/* =================================================
-              HERO
-          ================================================= */}
-
           <section className="relative overflow-hidden rounded-[38px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-7 shadow-[0_35px_90px_rgba(0,0,0,0.20)] sm:p-10">
             <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-              {/* TEXTE */}
-
               <div>
                 <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-[#a9c9ff]">
                   <span className="h-2 w-2 rounded-full bg-[#a9c9ff]" />
@@ -972,8 +1039,7 @@ export default function QcmPage() {
                           )
                         }
                         className={`rounded-2xl border px-4 py-4 text-center transition ${
-                          questionCount ===
-                          count
+                          questionCount === count
                             ? "border-white/25 bg-white/10 text-white"
                             : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07]"
                         }`}
@@ -990,8 +1056,6 @@ export default function QcmPage() {
                   )}
                 </div>
               </div>
-
-              {/* COCKPIT */}
 
               <div className="relative min-h-[430px] overflow-hidden rounded-[32px] border border-white/10 bg-[#182332]/55">
                 <div className="absolute left-1/2 top-1/2 h-[390px] w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10">
@@ -1020,17 +1084,11 @@ export default function QcmPage() {
                     aria-hidden="true"
                   >
                     <path d="M153 28H167L181 135L162 292H158L139 135L153 28Z" />
-
                     <path d="M140 111L44 177L44 198L151 160L140 111Z" />
-
                     <path d="M180 111L276 177L276 198L169 160L180 111Z" />
-
                     <path d="M140 229L88 274L88 292L151 258L140 229Z" />
-
                     <path d="M180 229L232 274L232 292L169 258L180 229Z" />
-
                     <path d="M153 28L160 10L167 28Z" />
-
                     <path
                       d="M160 43L164 132L160 245L156 132L160 43Z"
                       fill="rgba(169,201,255,0.8)"
@@ -1080,8 +1138,6 @@ export default function QcmPage() {
                 </div>
               </div>
             </div>
-
-            {/* FORMULAIRE */}
 
             <div className="mt-10 border-t border-white/[0.08] pt-8">
               <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -1156,9 +1212,9 @@ export default function QcmPage() {
     );
   }
 
-  /* ============================================================
-     QCM EN COURS
-  ============================================================ */
+  // =========================================================
+  // QCM EN COURS / CORRECTION
+  // =========================================================
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#182332] text-white">
@@ -1177,9 +1233,7 @@ export default function QcmPage() {
       </div>
 
       <div className="relative mx-auto max-w-[1250px] px-4 py-7 sm:px-6 lg:px-8">
-        {/* =====================================================
-            HEADER
-        ===================================================== */}
+        {/* HEADER */}
 
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1193,17 +1247,19 @@ export default function QcmPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-white/10 bg-[#202d3d] px-4 py-3">
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Temps
-              </div>
+            {!finished && (
+              <div className="rounded-2xl border border-white/10 bg-[#202d3d] px-4 py-3">
+                <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                  Temps
+                </div>
 
-              <div className="mt-1 text-lg font-black text-white">
-                {formatTime(
-                  seconds,
-                )}
+                <div className="mt-1 text-lg font-black text-white">
+                  {formatTime(
+                    seconds,
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               type="button"
@@ -1216,262 +1272,495 @@ export default function QcmPage() {
         </div>
 
         {/* =====================================================
-            PROGRESSION
+            QCM EN COURS
         ===================================================== */}
 
-        <div className="mb-5 rounded-3xl border border-white/10 bg-[#202d3d] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Progression
-              </div>
+        {!finished && (
+          <>
+            {/* PROGRESSION */}
 
-              <div className="mt-1 text-sm font-black text-white">
-                Question{" "}
-                {currentIndex + 1} /{" "}
-                {questions.length}
-              </div>
-            </div>
+            <div className="mb-5 rounded-3xl border border-white/10 bg-[#202d3d] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Progression
+                  </div>
 
-            <div className="text-xs font-black text-[#a9c9ff]">
-              {answeredCount}/
-              {questions.length}
-            </div>
-          </div>
-
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full rounded-full bg-[#6ea8ff] transition-all"
-              style={{
-                width: `${
-                  ((currentIndex + 1) /
-                    questions.length) *
-                  100
-                }%`,
-              }}
-            />
-          </div>
-        </div>
-
-        {/* =====================================================
-            QUESTION
-        ===================================================== */}
-
-        {currentQuestion && (
-          <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[#202d3d] shadow-[0_25px_70px_rgba(0,0,0,0.12)]">
-            <div className="absolute right-[-100px] top-[-100px] h-[300px] w-[300px] rounded-full bg-white/[0.025] blur-[80px]" />
-
-            <div className="relative p-6 sm:p-8 lg:p-10">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
-                  Question{" "}
-                  {currentIndex + 1}
+                  <div className="mt-1 text-sm font-black text-white">
+                    Question{" "}
+                    {currentIndex + 1} /{" "}
+                    {questions.length}
+                  </div>
                 </div>
 
-                {finished &&
-                  currentCorrection && (
-                    <div
-                      className={`rounded-full px-4 py-2 text-xs font-black ${
-                        currentCorrection.isCorrect
-                          ? "bg-emerald-400/10 text-emerald-300"
-                          : "bg-red-400/10 text-red-300"
-                      }`}
-                    >
-                      {currentCorrection.isCorrect
-                        ? "CORRECT"
-                        : "INCORRECT"}
-                    </div>
-                  )}
+                <div className="text-xs font-black text-[#a9c9ff]">
+                  {answeredCount}/
+                  {questions.length}
+                </div>
               </div>
 
-              <h2 className="mt-5 max-w-4xl text-2xl font-black leading-tight text-white sm:text-3xl">
-                {
-                  currentQuestion.question
-                }
-              </h2>
-
-              <div className="mt-8 space-y-3">
-                {currentQuestion.answers.map(
-                  (
-                    answer,
-                    index,
-                  ) => {
-                    const selected =
-                      currentAnswer ===
-                      answer.id;
-
-                    const isCorrect =
-                      finished &&
-                      currentCorrection?.correctAnswerId ===
-                        answer.id;
-
-                    const isWrongSelected =
-                      finished &&
-                      selected &&
-                      !currentCorrection?.isCorrect;
-
-                    return (
-                      <button
-                        key={answer.id}
-                        type="button"
-                        onClick={() =>
-                          chooseAnswer(
-                            answer.id,
-                          )
-                        }
-                        disabled={
-                          finished
-                        }
-                        className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition ${
-                          isCorrect
-                            ? "border-emerald-300/30 bg-emerald-400/10"
-                            : isWrongSelected
-                              ? "border-red-300/30 bg-red-400/10"
-                              : selected
-                                ? "border-white/25 bg-white/[0.10]"
-                                : "border-white/10 bg-[#182332] hover:border-white/20 hover:bg-[#28384b]"
-                        }`}
-                      >
-                        <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
-                            isCorrect
-                              ? "bg-emerald-400/15 text-emerald-300"
-                              : isWrongSelected
-                                ? "bg-red-400/15 text-red-300"
-                                : selected
-                                  ? "bg-white/10 text-white"
-                                  : "bg-white/[0.05] text-slate-500"
-                          }`}
-                        >
-                          {String.fromCharCode(
-                            65 + index,
-                          )}
-                        </div>
-
-                        <span className="pt-1 text-sm font-semibold leading-6 text-slate-200">
-                          {answer.answer}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-
-              {finished &&
-                currentCorrection?.explanation && (
-                  <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-                    <div className="text-[8px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
-                      Explication
-                    </div>
-
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
-                      {
-                        currentCorrection.explanation
-                      }
-                    </p>
-                  </div>
-                )}
-
-              {/* NAVIGATION */}
-
-              <div className="mt-8 flex flex-col gap-3 border-t border-white/[0.07] pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  onClick={
-                    previousQuestion
-                  }
-                  disabled={
-                    currentIndex === 0
-                  }
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ← Précédente
-                </button>
-
-                {!finished ? (
-                  currentIndex ===
-                  questions.length -
-                    1 ? (
-                    <button
-                      type="button"
-                      onClick={
-                        finishQcm
-                      }
-                      disabled={
-                        correcting
-                      }
-                      className="rounded-2xl bg-[#6ea8ff] px-6 py-3 text-sm font-black text-[#122033] transition hover:bg-[#83b5ff] disabled:opacity-50"
-                    >
-                      {correcting
-                        ? "Correction..."
-                        : "Terminer le QCM"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={
-                        nextQuestion
-                      }
-                      className="rounded-2xl bg-[#6ea8ff] px-6 py-3 text-sm font-black text-[#122033] transition hover:bg-[#83b5ff]"
-                    >
-                      Question suivante →
-                    </button>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    onClick={
-                      nextQuestion
-                    }
-                    disabled={
-                      currentIndex ===
-                      questions.length -
-                        1
-                    }
-                    className="rounded-2xl bg-white/[0.08] px-6 py-3 text-sm font-black text-white transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    Question suivante →
-                  </button>
-                )}
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-[#6ea8ff] transition-all"
+                  style={{
+                    width: `${
+                      ((currentIndex + 1) /
+                        questions.length) *
+                      100
+                    }%`,
+                  }}
+                />
               </div>
             </div>
-          </section>
+
+            {/* QUESTION */}
+
+            {currentQuestion && (
+              <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[#202d3d] shadow-[0_25px_70px_rgba(0,0,0,0.12)]">
+                <div className="absolute right-[-100px] top-[-100px] h-[300px] w-[300px] rounded-full bg-white/[0.025] blur-[80px]" />
+
+                <div className="relative p-6 sm:p-8 lg:p-10">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#a9c9ff]">
+                      Question{" "}
+                      {currentIndex + 1}
+                    </div>
+                  </div>
+
+                  <h2 className="mt-5 max-w-4xl text-2xl font-black leading-tight text-white sm:text-3xl">
+                    {
+                      currentQuestion.question
+                    }
+                  </h2>
+
+                  {/* BOUTON SIGNALER */}
+
+                  <div className="mt-5">
+                    {!reportOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReportOpen(
+                            true,
+                          );
+                          setReportMessage(
+                            "",
+                          );
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-300/20 bg-red-400/5 px-4 py-2 text-xs font-bold text-red-300 transition hover:border-red-300/30 hover:bg-red-400/10"
+                      >
+                        ⚠️ Signaler cette question
+                      </button>
+                    ) : (
+                      <div className="rounded-2xl border border-red-300/20 bg-red-400/5 p-5">
+                        <div className="text-sm font-black text-red-200">
+                          Signaler cette question
+                        </div>
+
+                        <p className="mt-1 text-xs leading-5 text-slate-400">
+                          Indique ce qui te semble incorrect afin que l&apos;administrateur puisse vérifier la question.
+                        </p>
+
+                        <textarea
+                          value={
+                            reportReason
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            setReportReason(
+                              event.target
+                                .value,
+                            )
+                          }
+                          placeholder="Exemple : la réponse B semble incorrecte..."
+                          className="mt-4 min-h-24 w-full rounded-xl border border-white/10 bg-[#182332] p-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-red-300/30"
+                        />
+
+                        {reportMessage && (
+                          <div className="mt-3 rounded-xl bg-white/[0.04] px-4 py-3 text-xs font-semibold text-slate-300">
+                            {
+                              reportMessage
+                            }
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={
+                              reportQuestion
+                            }
+                            disabled={
+                              reporting
+                            }
+                            className="rounded-xl bg-red-400 px-4 py-2.5 text-xs font-black text-[#182332] transition hover:bg-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {reporting
+                              ? "Envoi..."
+                              : "Envoyer le signalement"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReportOpen(
+                                false,
+                              );
+                              setReportReason(
+                                "",
+                              );
+                              setReportMessage(
+                                "",
+                              );
+                            }}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/[0.08]"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RÉPONSES */}
+
+                  <div className="mt-8 space-y-3">
+                    {currentQuestion.answers.map(
+                      (
+                        answer,
+                        index,
+                      ) => {
+                        const selected =
+                          currentAnswer ===
+                          answer.id;
+
+                        return (
+                          <button
+                            key={answer.id}
+                            type="button"
+                            onClick={() =>
+                              chooseAnswer(
+                                answer.id,
+                              )
+                            }
+                            className={`flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition ${
+                              selected
+                                ? "border-white/25 bg-white/[0.10]"
+                                : "border-white/10 bg-[#182332] hover:border-white/20 hover:bg-[#28384b]"
+                            }`}
+                          >
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+                                selected
+                                  ? "bg-white/10 text-white"
+                                  : "bg-white/[0.05] text-slate-500"
+                              }`}
+                            >
+                              {String.fromCharCode(
+                                65 + index,
+                              )}
+                            </div>
+
+                            <span className="pt-1 text-sm font-semibold leading-6 text-slate-200">
+                              {
+                                answer.answer
+                              }
+                            </span>
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+
+                  {/* NAVIGATION */}
+
+                  <div className="mt-8 flex flex-col gap-3 border-t border-white/[0.07] pt-6 sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                      type="button"
+                      onClick={
+                        previousQuestion
+                      }
+                      disabled={
+                        currentIndex === 0
+                      }
+                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      ← Précédente
+                    </button>
+
+                    {currentIndex ===
+                    questions.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={
+                          finishQcm
+                        }
+                        disabled={
+                          correcting
+                        }
+                        className="rounded-2xl bg-[#6ea8ff] px-6 py-3 text-sm font-black text-[#122033] transition hover:bg-[#83b5ff] disabled:opacity-50"
+                      >
+                        {correcting
+                          ? "Correction..."
+                          : "Terminer le QCM"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={
+                          nextQuestion
+                        }
+                        className="rounded-2xl bg-[#6ea8ff] px-6 py-3 text-sm font-black text-[#122033] transition hover:bg-[#83b5ff]"
+                      >
+                        Question suivante →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         {/* =====================================================
-            RESULTAT
+            CORRECTION : UNIQUEMENT LES ERREURS
         ===================================================== */}
 
         {finished &&
           correction && (
-            <section className="mt-5 rounded-[32px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-6 sm:p-8">
-              <div className="grid gap-6 sm:grid-cols-3 sm:items-center">
-                <div>
-                  <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
-                    Résultat
+            <section className="space-y-5">
+              {/* RÉSULTAT */}
+
+              <section className="rounded-[32px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-6 sm:p-8">
+                <div className="grid gap-6 sm:grid-cols-3 sm:items-center">
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
+                      Résultat
+                    </div>
+
+                    <div className="mt-2 text-5xl font-black text-white">
+                      {
+                        correction.percentage
+                      }%
+                    </div>
                   </div>
 
-                  <div className="mt-2 text-5xl font-black text-white">
-                    {
-                      correction.percentage
-                    }%
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
+                      Score
+                    </div>
+
+                    <div className="mt-2 text-3xl font-black text-white">
+                      {correction.score}/
+                      {
+                        correction.total
+                      }
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
+                      Erreurs
+                    </div>
+
+                    <div className="mt-2 text-3xl font-black text-red-300">
+                      {
+                        wrongCorrections.length
+                      }
+                    </div>
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <div className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
-                    Score
+              {/* AUCUNE ERREUR */}
+
+              {wrongCorrections.length ===
+                0 && (
+                <section className="rounded-[32px] border border-emerald-300/20 bg-emerald-400/5 p-8 text-center">
+                  <div className="text-4xl">
+                    🎉
                   </div>
 
-                  <div className="mt-2 text-3xl font-black text-white">
-                    {correction.score}/
-                    {
-                      correction.total
-                    }
+                  <h2 className="mt-4 text-2xl font-black text-emerald-300">
+                    Félicitations !
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Tu as répondu correctement à
+                    toutes les questions.
+                  </p>
+                </section>
+              )}
+
+              {/* QUESTIONS FAUSSES */}
+
+              {wrongCorrections.length >
+                0 && (
+                <div className="space-y-5">
+                  <div className="px-1">
+                    <div className="text-[9px] font-black uppercase tracking-[0.25em] text-red-300">
+                      Correction
+                    </div>
+
+                    <h2 className="mt-2 text-2xl font-black text-white">
+                      Tes erreurs
+                    </h2>
+
+                    <p className="mt-2 text-sm text-slate-400">
+                      Seules les questions auxquelles tu as répondu faux sont affichées.
+                    </p>
                   </div>
+
+                  {wrongCorrections.map(
+                    (
+                      correctionItem,
+                      errorIndex,
+                    ) => {
+                      const question =
+                        questions.find(
+                          (item) =>
+                            item.id ===
+                            correctionItem.questionId,
+                        );
+
+                      if (!question) {
+                        return null;
+                      }
+
+                      return (
+                        <section
+                          key={
+                            correctionItem.questionId
+                          }
+                          className="relative overflow-hidden rounded-[34px] border border-red-300/15 bg-[#202d3d] shadow-[0_25px_70px_rgba(0,0,0,0.12)]"
+                        >
+                          <div className="absolute right-[-100px] top-[-100px] h-[300px] w-[300px] rounded-full bg-red-400/[0.025] blur-[80px]" />
+
+                          <div className="relative p-6 sm:p-8 lg:p-10">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="text-[9px] font-black uppercase tracking-[0.25em] text-red-300">
+                                  Erreur{" "}
+                                  {errorIndex +
+                                    1}{" "}
+                                  /{" "}
+                                  {
+                                    wrongCorrections.length
+                                  }
+                                </div>
+
+                                <h3 className="mt-4 max-w-4xl text-2xl font-black leading-tight text-white sm:text-3xl">
+                                  {
+                                    question.question
+                                  }
+                                </h3>
+                              </div>
+
+                              <div className="shrink-0 rounded-full bg-red-400/10 px-4 py-2 text-xs font-black text-red-300">
+                                INCORRECT
+                              </div>
+                            </div>
+
+                            {/* RÉPONSES */}
+
+                            <div className="mt-8 space-y-3">
+                              {question.answers.map(
+                                (
+                                  answer,
+                                  index,
+                                ) => {
+                                  const isCorrect =
+                                    correctionItem.correctAnswerId ===
+                                    answer.id;
+
+                                  const isSelected =
+                                    correctionItem.selectedAnswerId ===
+                                    answer.id;
+
+                                  return (
+                                    <div
+                                      key={
+                                        answer.id
+                                      }
+                                      className={`flex w-full items-start gap-4 rounded-2xl border p-4 ${
+                                        isCorrect
+                                          ? "border-emerald-300/30 bg-emerald-400/10"
+                                          : isSelected
+                                            ? "border-red-300/30 bg-red-400/10"
+                                            : "border-white/10 bg-[#182332]"
+                                      }`}
+                                    >
+                                      <div
+                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+                                          isCorrect
+                                            ? "bg-emerald-400/15 text-emerald-300"
+                                            : isSelected
+                                              ? "bg-red-400/15 text-red-300"
+                                              : "bg-white/[0.05] text-slate-500"
+                                        }`}
+                                      >
+                                        {String.fromCharCode(
+                                          65 +
+                                            index,
+                                        )}
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="pt-1 text-sm font-semibold leading-6 text-slate-200">
+                                            {
+                                              answer.answer
+                                            }
+                                          </span>
+
+                                          {isCorrect && (
+                                            <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-300">
+                                              Bonne réponse
+                                            </span>
+                                          )}
+
+                                          {isSelected &&
+                                            !isCorrect && (
+                                              <span className="rounded-full bg-red-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-red-300">
+                                                Ta réponse
+                                              </span>
+                                            )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                },
+                              )}
+                            </div>
+
+                            {/* EXPLICATION */}
+
+                            {correctionItem.explanation && (
+                              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+                                <div className="text-[8px] font-black uppercase tracking-[0.22em] text-[#a9c9ff]">
+                                  Explication
+                                </div>
+
+                                <p className="mt-2 text-sm leading-6 text-slate-300">
+                                  {
+                                    correctionItem.explanation
+                                  }
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </section>
+                      );
+                    },
+                  )}
                 </div>
+              )}
 
-                <div className="flex gap-3 sm:justify-end">
+              {/* BOUTONS */}
+
+              <section className="rounded-[32px] border border-white/10 bg-gradient-to-br from-[#233246] via-[#293b4f] to-[#30475d] p-6 sm:p-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={reset}
@@ -1487,9 +1776,9 @@ export default function QcmPage() {
                     Progression
                   </Link>
                 </div>
-              </div>
-            </section>
-          )}
+              </section>
+          </section>
+        )}
 
         <div className="h-8" />
       </div>
