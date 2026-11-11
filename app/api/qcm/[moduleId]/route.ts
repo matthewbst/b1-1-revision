@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
@@ -13,183 +14,113 @@ export async function GET(
 ) {
   try {
     const params = await context.params;
+    const moduleId = Number(params.moduleId);
 
-    const moduleIdString =
-      params?.moduleId;
-
-    const moduleId = Number(
-      moduleIdString
-    );
-
-    if (
-      !moduleIdString ||
-      !Number.isInteger(moduleId) ||
-      moduleId <= 0
-    ) {
+    if (!Number.isInteger(moduleId) || moduleId <= 0) {
       return NextResponse.json(
-        {
-          error: `Module invalide. Identifiant reçu : ${String(
-            moduleIdString
-          )}`,
-        },
+        { error: "Module invalide." },
         { status: 400 }
       );
     }
 
-    const url = new URL(
-      request.url
-    );
+    const url = new URL(request.url);
+    const rawCount = Number(url.searchParams.get("count") ?? "10");
+    const count = [10, 20, 30].includes(rawCount) ? rawCount : 10;
 
-    const rawCount = Number(
-      url.searchParams.get(
-        "count"
-      ) ?? "10"
-    );
-
-    const count = [10, 20, 30].includes(
-      rawCount
-    )
-      ? rawCount
-      : 10;
-
-    const {
-      data: module,
-      error: moduleError,
-    } = await supabase
+    const { data: module, error: moduleError } = await supabase
       .from("modules")
-      .select(
-        "id, name, description"
-      )
+      .select("id, name, description")
       .eq("id", moduleId)
       .single();
 
-    if (
-      moduleError ||
-      !module
-    ) {
+    if (moduleError || !module) {
       return NextResponse.json(
-        {
-          error:
-            moduleError?.message ??
-            "Module introuvable.",
-        },
+        { error: moduleError?.message ?? "Module introuvable." },
         { status: 404 }
       );
     }
 
-    const {
-      data: questions,
-      error: questionsError,
-    } = await supabase
+    const { data: questions, error: questionsError } = await supabase
       .from("questions")
-      .select(
-        `
-        id,
-        question,
-        answers (
-          id,
-          answer,
-          is_correct
-        )
-        `
-      )
-      .eq(
-        "module_id",
-        moduleId
-      )
-      .eq(
-        "status",
-        "approved"
-      );
+      .select("id, question, options, correct_answer")
+      .eq("module_id", moduleId)
+      .eq("status", "approved")
+      .eq("is_validated", true);
 
     if (questionsError) {
       return NextResponse.json(
-        {
-          error:
-            questionsError.message,
-        },
+        { error: questionsError.message },
         { status: 500 }
       );
     }
 
-    const validQuestions = (
-      questions ?? []
-    ).filter((question) => {
-      const answers =
-        question.answers ??
-        [];
+    const validQuestions = (questions ?? [])
+      .map((question) => {
+        const options = Array.isArray(question.options)
+          ? question.options
+          : [];
 
-      const correctCount =
-        answers.filter(
-          (answer) =>
-            answer.is_correct ===
-            true
-        ).length;
+        const correctOption = options.find(
+          (option: { label?: string; text?: string }) =>
+            option.label === question.correct_answer
+        );
 
-      const uniqueAnswers =
-        new Set(
-          answers.map(
-            (answer) =>
-              answer.answer
-                .trim()
-                .toLowerCase()
+        if (
+          options.length !== 3 ||
+          !correctOption ||
+          options.some(
+            (option: { text?: string }) =>
+              typeof option.text !== "string" || !option.text.trim()
+          )
+        ) {
+          return null;
+        }
+
+        const uniqueAnswers = new Set(
+          options.map(
+            (option: { text: string }) =>
+              option.text.trim().toLowerCase()
           )
         );
 
-      return (
-        answers.length === 3 &&
-        correctCount === 1 &&
-        uniqueAnswers.size === 3
-      );
-    });
+        if (uniqueAnswers.size !== 3) return null;
 
-    const shuffledQuestions =
-      [...validQuestions].sort(
-        () =>
-          Math.random() -
-          0.5
-      );
-
-    const selectedQuestions =
-      shuffledQuestions
-        .slice(0, count)
-        .map((question) => ({
+        return {
           id: question.id,
-          question:
-            question.question,
-          answers: [
-            ...(question.answers ??
-              []),
-          ]
-            .sort(
-              () =>
-                Math.random() -
-                0.5
-            )
-            .map(
-              ({
-                id,
-                answer,
-              }) => ({
-                id,
-                answer,
-              })
-            ),
-        }));
+          question: question.question,
+          answers: options.map(
+            (option: { label: string; text: string }) => ({
+              id: `${question.id}-${option.label}`,
+              answer: option.text,
+              is_correct: option.label === question.correct_answer,
+            })
+          ),
+        };
+      })
+      .filter((question) => question !== null);
+
+    const shuffledQuestions = [...validQuestions].sort(
+      () => Math.random() - 0.5
+    );
+
+    const selectedQuestions = shuffledQuestions
+      .slice(0, count)
+      .map((question) => ({
+        id: question.id,
+        question: question.question,
+        answers: [...question.answers]
+          .sort(() => Math.random() - 0.5)
+          .map(({ id, answer }) => ({ id, answer })),
+      }));
 
     return NextResponse.json({
       module,
-      availableCount:
-        validQuestions.length,
+      availableCount: validQuestions.length,
       requestedCount: count,
-      questions:
-        selectedQuestions,
+      questions: selectedQuestions,
     });
   } catch (error) {
-    console.error(
-      "Erreur API QCM :",
-      error
-    );
+    console.error("Erreur API QCM :", error);
 
     return NextResponse.json(
       {
